@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, clientsTable, expensesTable } from "@workspace/db";
+import { db, clientsTable, expensesTable, billingsTable, billingItemsTable } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
@@ -20,6 +20,9 @@ router.get("/", requireAuth, async (req, res) => {
 router.post("/", requireAuth, async (req, res) => {
   const userId = (req as any).userId;
   const { name, document, phone, email, address, monthlyFee, dueDay, status, notes } = req.body;
+  const clientStatus = status ?? "ativo";
+  const clientDueDay = dueDay ?? 10;
+
   const [row] = await db.insert(clientsTable).values({
     userId,
     name,
@@ -28,10 +31,39 @@ router.post("/", requireAuth, async (req, res) => {
     email,
     address,
     monthlyFee: String(monthlyFee),
-    dueDay: dueDay ?? 10,
-    status: status ?? "ativo",
+    dueDay: clientDueDay,
+    status: clientStatus,
     notes,
   }).returning();
+
+  // Auto-generate billing for the current month when client has a fee and is active
+  const fee = parseFloat(String(monthlyFee ?? 0));
+  if (fee > 0 && clientStatus === "ativo") {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+    const dueDate = `${year}-${String(month).padStart(2, "0")}-${String(clientDueDay).padStart(2, "0")}`;
+
+    const [billing] = await db.insert(billingsTable).values({
+      userId,
+      clientId: row.id,
+      month,
+      year,
+      dueDate,
+      monthlyFee: String(fee),
+      expensesTotal: "0",
+      totalAmount: String(fee),
+      status: "pendente",
+    }).returning();
+
+    await db.insert(billingItemsTable).values({
+      billingId: billing.id,
+      description: `Honorário referente a ${month}/${year}`,
+      amount: String(fee),
+      itemType: "honorario",
+    });
+  }
+
   return res.status(201).json(formatClient(row));
 });
 
@@ -79,7 +111,8 @@ router.get("/:id/monthly-close/:year/:month", requireAuth, async (req, res) => {
   if (!client) return res.status(404).json({ error: "Not found" });
 
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-  const endDate = `${year}-${String(month).padStart(2, "0")}-31`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
   const expenses = await db.select().from(expensesTable).where(
     and(
