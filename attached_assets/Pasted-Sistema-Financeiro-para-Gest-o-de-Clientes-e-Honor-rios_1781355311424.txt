@@ -1,0 +1,225 @@
+Sistema Financeiro para Gestão de Clientes e Honorários
+
+Crie um sistema web completo para gestão financeira de clientes, com foco em controle de honorários mensais e reembolso de despesas realizadas em nome dos clientes.
+
+Objetivo
+
+Permitir que o usuário registre receitas, despesas e gastos realizados para cada cliente, gerando automaticamente o valor total a ser cobrado no fechamento mensal.
+
+Funcionalidades
+
+Dashboard
+
+Total de receitas do mês
+
+Total de despesas do mês
+
+Saldo atual
+
+Clientes ativos
+
+Contas a receber
+
+Contas a pagar
+
+Gráficos de fluxo de caixa
+
+Cadastro de Clientes
+
+Campos:
+
+Nome/Razão Social
+
+CPF/CNPJ
+
+Telefone
+
+E-mail
+
+Endereço
+
+Valor do honorário mensal
+
+Dia de vencimento
+
+Status (Ativo/Inativo)
+
+Observações
+
+Gestão de Despesas
+
+Permitir cadastrar:
+
+Data
+
+Descrição
+
+Valor
+
+Categoria
+
+Cliente vinculado (opcional)
+
+Anexo de comprovante
+
+Campo "Repassar ao cliente?" (Sim/Não)
+
+Se marcado como "Sim", a despesa deve ser incluída automaticamente na próxima cobrança do cliente.
+
+Gestão de Receitas
+
+Permitir cadastrar:
+
+Data
+
+Cliente
+
+Descrição
+
+Valor
+
+Forma de pagamento
+
+Status (Recebido/Pendente)
+
+Fechamento Mensal por Cliente
+
+Para cada cliente exibir:
+
+Honorário mensal
+
+Lista de despesas repassáveis
+
+Total de despesas
+
+Valor total a cobrar
+
+Exemplo:
+
+Honorário: R$ 500,00
+
+Despesas:
+
+Certificado Digital: R$ 180,00
+
+Taxa Junta Comercial: R$ 120,00
+
+Reconhecimento de Firma: R$ 25,00
+
+Total da cobrança: R$ 825,00
+
+Cobranças
+
+Gerar cobrança mensal automática contendo:
+
+Honorário
+
+Despesas repassáveis
+
+Total final
+
+Status:
+
+Pendente
+
+Pago
+
+Atrasado
+
+Contas a Receber
+
+Lista de cobranças pendentes
+
+Filtro por cliente
+
+Filtro por período
+
+Marcar como pago
+
+Contas a Pagar
+
+Despesas internas da empresa
+
+Controle de vencimentos
+
+Marcar como pago
+
+Relatórios
+
+Fluxo de caixa
+
+Receitas por período
+
+Despesas por período
+
+Lucratividade por cliente
+
+Clientes com pagamentos pendentes
+
+Exportação para PDF e Excel
+
+Banco de Dados
+
+Tabelas:
+
+usuarios
+
+clientes
+
+categorias
+
+receitas
+
+despesas
+
+cobrancas
+
+itens_cobranca
+
+pagamentos
+
+Regras de Negócio
+
+Toda despesa pode ou não ser vinculada a um cliente.
+
+Toda despesa marcada como "Repassar ao cliente" deve aparecer automaticamente na próxima cobrança.
+
+O sistema deve calcular automaticamente:
+
+Total de despesas do cliente
+
+Valor do honorário
+
+Valor final da cobrança
+
+Não permitir exclusão de registros financeiros já pagos.
+
+Manter histórico completo de alterações.
+
+Interface
+
+Design moderno e profissional.
+
+Responsivo para desktop e celular.
+
+Tema claro e escuro.
+
+Tabelas com filtros e paginação.
+
+Dashboard com gráficos interativos.
+
+Tecnologias
+
+Frontend: React + TypeScript + Tailwind CSS.
+
+Backend: Supabase.
+
+Autenticação por e-mail e senha.
+
+Controle de acesso por usuário.
+
+Banco de dados relacional.
+
+Geração de PDF para cobranças e relatórios.
+
+Crie todas as telas, banco de dados, relacionamentos, regras de negócio e dados de exemplo para que o sistema esteja pronto para uso após a publicação.

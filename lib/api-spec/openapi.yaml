@@ -3,20 +3,32 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Financial management system API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: clients
+    description: Client management
+  - name: categories
+    description: Expense categories
+  - name: revenues
+    description: Revenue management
+  - name: expenses
+    description: Expense management
+  - name: billings
+    description: Monthly billing management
+  - name: dashboard
+    description: Dashboard summaries and analytics
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +36,567 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── DASHBOARD ──────────────────────────────────────────────────────────────
+  /dashboard/summary/{year}/{month}:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard financial summary for a month
+      parameters:
+        - name: year
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: month
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/cashflow:
+    get:
+      operationId: getDashboardCashflow
+      tags: [dashboard]
+      summary: Get monthly cashflow for chart (last 12 months)
+      responses:
+        "200":
+          description: Monthly cashflow data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CashflowMonth"
+
+  /dashboard/client-profitability:
+    get:
+      operationId: getClientProfitability
+      tags: [dashboard]
+      summary: Get profitability per client
+      responses:
+        "200":
+          description: Client profitability list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClientProfitability"
+
+  # ── CLIENTS ────────────────────────────────────────────────────────────────
+  /clients:
+    get:
+      operationId: listClients
+      tags: [clients]
+      summary: List all clients
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [ativo, inativo]
+      responses:
+        "200":
+          description: List of clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Client"
+    post:
+      operationId: createClient
+      tags: [clients]
+      summary: Create a new client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientInput"
+      responses:
+        "201":
+          description: Created client
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+
+  /clients/{id}:
+    get:
+      operationId: getClient
+      tags: [clients]
+      summary: Get client by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Client
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateClient
+      tags: [clients]
+      summary: Update client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientUpdate"
+      responses:
+        "200":
+          description: Updated client
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+    delete:
+      operationId: deleteClient
+      tags: [clients]
+      summary: Delete client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /clients/{id}/monthly-close/{year}/{month}:
+    get:
+      operationId: getClientMonthlyClose
+      tags: [clients]
+      summary: Get monthly closing details for a client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: year
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: month
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Monthly close details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonthlyClose"
+
+  # ── CATEGORIES ─────────────────────────────────────────────────────────────
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [categories]
+      summary: List all categories
+      responses:
+        "200":
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+    post:
+      operationId: createCategory
+      tags: [categories]
+      summary: Create a new category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "201":
+          description: Created category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+
+  /categories/{id}:
+    delete:
+      operationId: deleteCategory
+      tags: [categories]
+      summary: Delete category
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── REVENUES ───────────────────────────────────────────────────────────────
+  /revenues:
+    get:
+      operationId: listRevenues
+      tags: [revenues]
+      summary: List revenues
+      parameters:
+        - name: clientId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [recebido, pendente]
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of revenues
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Revenue"
+    post:
+      operationId: createRevenue
+      tags: [revenues]
+      summary: Create a revenue entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevenueInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Revenue"
+
+  /revenues/{id}:
+    get:
+      operationId: getRevenue
+      tags: [revenues]
+      summary: Get revenue by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Revenue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Revenue"
+    patch:
+      operationId: updateRevenue
+      tags: [revenues]
+      summary: Update revenue
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevenueUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Revenue"
+    delete:
+      operationId: deleteRevenue
+      tags: [revenues]
+      summary: Delete revenue (only if not paid)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── EXPENSES ───────────────────────────────────────────────────────────────
+  /expenses:
+    get:
+      operationId: listExpenses
+      tags: [expenses]
+      summary: List expenses
+      parameters:
+        - name: clientId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: passToClient
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of expenses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Expense"
+    post:
+      operationId: createExpense
+      tags: [expenses]
+      summary: Create an expense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpenseInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Expense"
+
+  /expenses/{id}:
+    get:
+      operationId: getExpense
+      tags: [expenses]
+      summary: Get expense by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Expense
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Expense"
+    patch:
+      operationId: updateExpense
+      tags: [expenses]
+      summary: Update expense
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpenseUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Expense"
+    delete:
+      operationId: deleteExpense
+      tags: [expenses]
+      summary: Delete expense (only if not in a paid billing)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── BILLINGS ───────────────────────────────────────────────────────────────
+  /billings:
+    get:
+      operationId: listBillings
+      tags: [billings]
+      summary: List billings
+      parameters:
+        - name: clientId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pendente, pago, atrasado]
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of billings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Billing"
+    post:
+      operationId: createBilling
+      tags: [billings]
+      summary: Generate a monthly billing for a client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BillingInput"
+      responses:
+        "201":
+          description: Created billing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Billing"
+
+  /billings/{id}:
+    get:
+      operationId: getBilling
+      tags: [billings]
+      summary: Get billing by ID with line items
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Billing with items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingDetail"
+    delete:
+      operationId: deleteBilling
+      tags: [billings]
+      summary: Delete billing (only if not paid)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /billings/{id}/mark-paid:
+    post:
+      operationId: markBillingPaid
+      tags: [billings]
+      summary: Mark a billing as paid
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkPaidInput"
+      responses:
+        "200":
+          description: Updated billing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Billing"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +607,490 @@ components:
       required:
         - status
 
+    # ── DASHBOARD ─────────────────────────────────────────────────────────────
+    DashboardSummary:
+      type: object
+      required:
+        - totalRevenue
+        - totalExpenses
+        - balance
+        - activeClients
+        - pendingReceivables
+        - pendingPayables
+        - overdueCount
+      properties:
+        totalRevenue:
+          type: number
+        totalExpenses:
+          type: number
+        balance:
+          type: number
+        activeClients:
+          type: integer
+        pendingReceivables:
+          type: number
+        pendingPayables:
+          type: number
+        overdueCount:
+          type: integer
+
+    CashflowMonth:
+      type: object
+      required:
+        - month
+        - year
+        - label
+        - revenue
+        - expenses
+        - balance
+      properties:
+        month:
+          type: integer
+        year:
+          type: integer
+        label:
+          type: string
+        revenue:
+          type: number
+        expenses:
+          type: number
+        balance:
+          type: number
+
+    ClientProfitability:
+      type: object
+      required:
+        - clientId
+        - clientName
+        - totalBilled
+        - totalPaid
+        - pendingAmount
+        - billingCount
+      properties:
+        clientId:
+          type: integer
+        clientName:
+          type: string
+        totalBilled:
+          type: number
+        totalPaid:
+          type: number
+        pendingAmount:
+          type: number
+        billingCount:
+          type: integer
+
+    # ── CLIENT ────────────────────────────────────────────────────────────────
+    Client:
+      type: object
+      required:
+        - id
+        - name
+        - status
+        - monthlyFee
+        - dueDay
+        - createdAt
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        document:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        monthlyFee:
+          type: number
+        dueDay:
+          type: integer
+        status:
+          type: string
+          enum: [ativo, inativo]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    ClientInput:
+      type: object
+      required:
+        - name
+        - monthlyFee
+        - dueDay
+      properties:
+        name:
+          type: string
+        document:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        address:
+          type: string
+        monthlyFee:
+          type: number
+        dueDay:
+          type: integer
+        status:
+          type: string
+          enum: [ativo, inativo]
+          default: ativo
+        notes:
+          type: string
+
+    ClientUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        document:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        address:
+          type: string
+        monthlyFee:
+          type: number
+        dueDay:
+          type: integer
+        status:
+          type: string
+          enum: [ativo, inativo]
+        notes:
+          type: string
+
+    MonthlyClose:
+      type: object
+      required:
+        - clientId
+        - clientName
+        - month
+        - year
+        - monthlyFee
+        - expenses
+        - totalExpenses
+        - totalCharge
+      properties:
+        clientId:
+          type: integer
+        clientName:
+          type: string
+        month:
+          type: integer
+        year:
+          type: integer
+        monthlyFee:
+          type: number
+        expenses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Expense"
+        totalExpenses:
+          type: number
+        totalCharge:
+          type: number
+
+    # ── CATEGORY ──────────────────────────────────────────────────────────────
+    Category:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: ["string", "null"]
+
+    CategoryInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+
+    # ── REVENUE ───────────────────────────────────────────────────────────────
+    Revenue:
+      type: object
+      required:
+        - id
+        - date
+        - description
+        - amount
+        - status
+        - createdAt
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+        clientId:
+          type: ["integer", "null"]
+        clientName:
+          type: ["string", "null"]
+        description:
+          type: string
+        amount:
+          type: number
+        paymentMethod:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [recebido, pendente]
+        createdAt:
+          type: string
+
+    RevenueInput:
+      type: object
+      required:
+        - date
+        - description
+        - amount
+        - status
+      properties:
+        date:
+          type: string
+        clientId:
+          type: integer
+        description:
+          type: string
+        amount:
+          type: number
+        paymentMethod:
+          type: string
+        status:
+          type: string
+          enum: [recebido, pendente]
+
+    RevenueUpdate:
+      type: object
+      properties:
+        date:
+          type: string
+        clientId:
+          type: integer
+        description:
+          type: string
+        amount:
+          type: number
+        paymentMethod:
+          type: string
+        status:
+          type: string
+          enum: [recebido, pendente]
+
+    # ── EXPENSE ───────────────────────────────────────────────────────────────
+    Expense:
+      type: object
+      required:
+        - id
+        - date
+        - description
+        - amount
+        - passToClient
+        - createdAt
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        categoryId:
+          type: ["integer", "null"]
+        categoryName:
+          type: ["string", "null"]
+        clientId:
+          type: ["integer", "null"]
+        clientName:
+          type: ["string", "null"]
+        passToClient:
+          type: boolean
+        billedInId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    ExpenseInput:
+      type: object
+      required:
+        - date
+        - description
+        - amount
+        - passToClient
+      properties:
+        date:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        categoryId:
+          type: integer
+        clientId:
+          type: integer
+        passToClient:
+          type: boolean
+
+    ExpenseUpdate:
+      type: object
+      properties:
+        date:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        categoryId:
+          type: integer
+        clientId:
+          type: integer
+        passToClient:
+          type: boolean
+
+    # ── BILLING ───────────────────────────────────────────────────────────────
+    Billing:
+      type: object
+      required:
+        - id
+        - clientId
+        - clientName
+        - month
+        - year
+        - dueDate
+        - monthlyFee
+        - expensesTotal
+        - totalAmount
+        - status
+        - createdAt
+      properties:
+        id:
+          type: integer
+        clientId:
+          type: integer
+        clientName:
+          type: string
+        month:
+          type: integer
+        year:
+          type: integer
+        dueDate:
+          type: string
+        monthlyFee:
+          type: number
+        expensesTotal:
+          type: number
+        totalAmount:
+          type: number
+        status:
+          type: string
+          enum: [pendente, pago, atrasado]
+        paidAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    BillingDetail:
+      type: object
+      required:
+        - id
+        - clientId
+        - clientName
+        - month
+        - year
+        - dueDate
+        - monthlyFee
+        - expensesTotal
+        - totalAmount
+        - status
+        - createdAt
+        - items
+      properties:
+        id:
+          type: integer
+        clientId:
+          type: integer
+        clientName:
+          type: string
+        month:
+          type: integer
+        year:
+          type: integer
+        dueDate:
+          type: string
+        monthlyFee:
+          type: number
+        expensesTotal:
+          type: number
+        totalAmount:
+          type: number
+        status:
+          type: string
+          enum: [pendente, pago, atrasado]
+        paidAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BillingItem"
+
+    BillingItem:
+      type: object
+      required:
+        - id
+        - billingId
+        - description
+        - amount
+        - itemType
+      properties:
+        id:
+          type: integer
+        billingId:
+          type: integer
+        description:
+          type: string
+        amount:
+          type: number
+        itemType:
+          type: string
+          enum: [honorario, despesa]
+        expenseId:
+          type: ["integer", "null"]
+
+    BillingInput:
+      type: object
+      required:
+        - clientId
+        - month
+        - year
+      properties:
+        clientId:
+          type: integer
+        month:
+          type: integer
+        year:
+          type: integer
+
+    MarkPaidInput:
+      type: object
+      required:
+        - paidAt
+      properties:
+        paidAt:
+          type: string
