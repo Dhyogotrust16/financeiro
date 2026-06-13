@@ -22,6 +22,8 @@ tags:
     description: Monthly billing management
   - name: dashboard
     description: Dashboard summaries and analytics
+  - name: payables
+    description: Accounts payable (contas a pagar)
 
 paths:
   /healthz:
@@ -484,6 +486,124 @@ paths:
       responses:
         "204":
           description: Deleted
+
+  # ── PAYABLES ───────────────────────────────────────────────────────────────
+  /payables:
+    get:
+      operationId: listPayables
+      tags: [payables]
+      summary: List payables (contas a pagar)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pendente, pago]
+        - name: categoryId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of payables
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payable"
+    post:
+      operationId: createPayable
+      tags: [payables]
+      summary: Create a payable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayableInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payable"
+
+  /payables/{id}:
+    patch:
+      operationId: updatePayable
+      tags: [payables]
+      summary: Update a payable (only if pending)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayableInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payable"
+    delete:
+      operationId: deletePayable
+      tags: [payables]
+      summary: Delete a payable (only if pending)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /payables/{id}/pay:
+    post:
+      operationId: payPayable
+      tags: [payables]
+      summary: Mark payable as paid and create expense
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayPayableInput"
+      responses:
+        "200":
+          description: Paid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payable"
 
   # ── BILLINGS ───────────────────────────────────────────────────────────────
   /billings:
@@ -1088,6 +1208,63 @@ components:
           type: integer
 
     MarkPaidInput:
+      type: object
+      required:
+        - paidAt
+      properties:
+        paidAt:
+          type: string
+
+    # ── PAYABLES ──────────────────────────────────────────────────────────────
+    Payable:
+      type: object
+      required:
+        - id
+        - description
+        - amount
+        - dueDate
+        - status
+        - createdAt
+      properties:
+        id:
+          type: integer
+        description:
+          type: string
+        amount:
+          type: number
+        dueDate:
+          type: string
+        categoryId:
+          type: ["integer", "null"]
+        categoryName:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pendente, pago]
+        paidAt:
+          type: ["string", "null"]
+        expenseId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    PayableInput:
+      type: object
+      required:
+        - description
+        - amount
+        - dueDate
+      properties:
+        description:
+          type: string
+        amount:
+          type: number
+        dueDate:
+          type: string
+        categoryId:
+          type: integer
+
+    PayPayableInput:
       type: object
       required:
         - paidAt

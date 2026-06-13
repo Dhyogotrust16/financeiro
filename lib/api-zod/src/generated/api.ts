@@ -424,6 +424,103 @@ export const DeleteExpenseParams = zod.object({
 
 
 /**
+ * @summary List payables (contas a pagar)
+ */
+export const ListPayablesQueryParams = zod.object({
+  "status": zod.enum(['pendente', 'pago']).optional(),
+  "categoryId": zod.coerce.number().optional(),
+  "startDate": zod.coerce.string().optional(),
+  "endDate": zod.coerce.string().optional()
+})
+
+export const ListPayablesResponseItem = zod.object({
+  "id": zod.number(),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "dueDate": zod.string(),
+  "categoryId": zod.number().nullish(),
+  "categoryName": zod.string().nullish(),
+  "status": zod.enum(['pendente', 'pago']),
+  "paidAt": zod.string().nullish(),
+  "expenseId": zod.number().nullish(),
+  "createdAt": zod.string()
+})
+export const ListPayablesResponse = zod.array(ListPayablesResponseItem)
+
+
+/**
+ * @summary Create a payable
+ */
+export const CreatePayableBody = zod.object({
+  "description": zod.string(),
+  "amount": zod.number(),
+  "dueDate": zod.string(),
+  "categoryId": zod.number().optional()
+})
+
+
+/**
+ * @summary Update a payable (only if pending)
+ */
+export const UpdatePayableParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdatePayableBody = zod.object({
+  "description": zod.string(),
+  "amount": zod.number(),
+  "dueDate": zod.string(),
+  "categoryId": zod.number().optional()
+})
+
+export const UpdatePayableResponse = zod.object({
+  "id": zod.number(),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "dueDate": zod.string(),
+  "categoryId": zod.number().nullish(),
+  "categoryName": zod.string().nullish(),
+  "status": zod.enum(['pendente', 'pago']),
+  "paidAt": zod.string().nullish(),
+  "expenseId": zod.number().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a payable (only if pending)
+ */
+export const DeletePayableParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Mark payable as paid and create expense
+ */
+export const PayPayableParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PayPayableBody = zod.object({
+  "paidAt": zod.string()
+})
+
+export const PayPayableResponse = zod.object({
+  "id": zod.number(),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "dueDate": zod.string(),
+  "categoryId": zod.number().nullish(),
+  "categoryName": zod.string().nullish(),
+  "status": zod.enum(['pendente', 'pago']),
+  "paidAt": zod.string().nullish(),
+  "expenseId": zod.number().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary List billings
  */
 export const ListBillingsQueryParams = zod.object({

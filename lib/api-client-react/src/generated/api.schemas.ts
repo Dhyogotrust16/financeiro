@@ -300,6 +300,42 @@ export interface MarkPaidInput {
   paidAt: string;
 }
 
+export type PayableStatus = typeof PayableStatus[keyof typeof PayableStatus];
+
+
+export const PayableStatus = {
+  pendente: 'pendente',
+  pago: 'pago',
+} as const;
+
+export interface Payable {
+  id: number;
+  description: string;
+  amount: number;
+  dueDate: string;
+  /** @nullable */
+  categoryId?: number | null;
+  /** @nullable */
+  categoryName?: string | null;
+  status: PayableStatus;
+  /** @nullable */
+  paidAt?: string | null;
+  /** @nullable */
+  expenseId?: number | null;
+  createdAt: string;
+}
+
+export interface PayableInput {
+  description: string;
+  amount: number;
+  dueDate: string;
+  categoryId?: number;
+}
+
+export interface PayPayableInput {
+  paidAt: string;
+}
+
 export type ListClientsParams = {
 status?: ListClientsStatus;
 };
@@ -333,6 +369,21 @@ passToClient?: boolean;
 startDate?: string;
 endDate?: string;
 };
+
+export type ListPayablesParams = {
+status?: ListPayablesStatus;
+categoryId?: number;
+startDate?: string;
+endDate?: string;
+};
+
+export type ListPayablesStatus = typeof ListPayablesStatus[keyof typeof ListPayablesStatus];
+
+
+export const ListPayablesStatus = {
+  pendente: 'pendente',
+  pago: 'pago',
+} as const;
 
 export type ListBillingsParams = {
 clientId?: number;

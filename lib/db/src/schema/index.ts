@@ -3,3 +3,4 @@ export * from "./categories";
 export * from "./revenues";
 export * from "./expenses";
 export * from "./billings";
+export * from "./payables";
