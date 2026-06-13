@@ -435,10 +435,10 @@ export default function ContasPagar() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main table */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 min-w-0">
           <Card>
-            <CardContent className="p-0">
-              <Table>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table className="min-w-[560px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Vencimento</TableHead>

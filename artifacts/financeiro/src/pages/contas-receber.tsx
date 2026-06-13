@@ -382,17 +382,15 @@ export default function ContasReceber() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Tabela principal */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 min-w-0">
           <Card>
-            <CardContent className="p-0">
-              <Table>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table className="min-w-[500px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Vencimento</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Referência</TableHead>
-                    <TableHead className="text-right">Honorário</TableHead>
-                    <TableHead className="text-right">Despesas</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-[120px] text-right">Ações</TableHead>
@@ -402,14 +400,14 @@ export default function ContasReceber() {
                   {isLoading ? (
                     Array.from({ length: 5 }).map((_, i) => (
                       <TableRow key={i}>
-                        {Array.from({ length: 8 }).map((_, j) => (
+                        {Array.from({ length: 6 }).map((_, j) => (
                           <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                         ))}
                       </TableRow>
                     ))
                   ) : !enriched.length ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                         <div className="flex flex-col items-center gap-2">
                           <CheckCircle2 className="h-8 w-8 text-green-500 opacity-60" />
                           <span>Nenhuma cobrança encontrada para o período.</span>
@@ -430,8 +428,6 @@ export default function ContasReceber() {
                           </TableCell>
                           <TableCell className="font-medium">{billing.clientName}</TableCell>
                           <TableCell className="text-muted-foreground">{billing.month}/{billing.year}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{formatCurrency(billing.monthlyFee)}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{formatCurrency(billing.expensesTotal)}</TableCell>
                           <TableCell className="text-right font-semibold text-primary">{formatCurrency(billing.totalAmount)}</TableCell>
                           <TableCell>
                             {isPaid ? (
@@ -471,7 +467,7 @@ export default function ContasReceber() {
                 {!isLoading && !!enriched.length && (
                   <TableFooter>
                     <TableRow className="font-semibold border-t-2">
-                      <TableCell colSpan={5} className="text-right text-muted-foreground">Total Pendente</TableCell>
+                      <TableCell colSpan={3} className="text-right text-muted-foreground">Total Pendente</TableCell>
                       <TableCell className="text-right text-amber-600 dark:text-amber-400">
                         {formatCurrency(totalPendente)}
                       </TableCell>
