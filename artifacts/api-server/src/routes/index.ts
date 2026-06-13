@@ -5,6 +5,7 @@ import categoriesRouter from "./categories";
 import revenuesRouter from "./revenues";
 import expensesRouter from "./expenses";
 import billingsRouter from "./billings";
+import billingsPdfRouter from "./billings-pdf";
 import dashboardRouter from "./dashboard";
 
 const router: IRouter = Router();
@@ -15,6 +16,7 @@ router.use("/categories", categoriesRouter);
 router.use("/revenues", revenuesRouter);
 router.use("/expenses", expensesRouter);
 router.use("/billings", billingsRouter);
+router.use("/billings", billingsPdfRouter);
 router.use("/dashboard", dashboardRouter);
 
 export default router;
