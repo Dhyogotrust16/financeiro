@@ -2,6 +2,8 @@ import { useState } from "react";
 import {
   useListBillings,
   useMarkBillingPaid,
+  useCreateBilling,
+  useListClients,
   getListBillingsQueryKey,
 } from "@workspace/api-client-react";
 import { PeriodFilter, periodToDates, type PeriodValue } from "@/components/period-filter";
@@ -13,6 +15,13 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Form,
   FormControl,
@@ -38,7 +47,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Clock, AlertCircle, Banknote, Users } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, Banknote, Users, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
@@ -47,17 +56,35 @@ const markPaidSchema = z.object({
 });
 type MarkPaidForm = z.infer<typeof markPaidSchema>;
 
+const novaCobrancaSchema = z.object({
+  clientId: z.coerce.number().min(1, "Selecione um cliente"),
+  month: z.coerce.number().min(1).max(12),
+  year: z.coerce.number().min(2020).max(2099),
+});
+type NovaCobrancaForm = z.infer<typeof novaCobrancaSchema>;
+
+const MESES = [
+  { value: 1, label: "Janeiro" }, { value: 2, label: "Fevereiro" },
+  { value: 3, label: "Março" }, { value: 4, label: "Abril" },
+  { value: 5, label: "Maio" }, { value: 6, label: "Junho" },
+  { value: 7, label: "Julho" }, { value: 8, label: "Agosto" },
+  { value: 9, label: "Setembro" }, { value: 10, label: "Outubro" },
+  { value: 11, label: "Novembro" }, { value: 12, label: "Dezembro" },
+];
+
 type StatusFilter = "" | "pendente" | "pago";
 
 export default function ContasReceber() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const markBillingPaid = useMarkBillingPaid();
+  const createBilling = useCreateBilling();
 
   const now = new Date();
   const today = now.toISOString().split("T")[0];
 
   const [markingId, setMarkingId] = useState<number | null>(null);
+  const [isNovaCobrancaOpen, setIsNovaCobrancaOpen] = useState(false);
   const [period, setPeriod] = useState<PeriodValue | null>({
     month: now.getMonth() + 1,
     year: now.getFullYear(),
@@ -71,10 +98,20 @@ export default function ContasReceber() {
   };
 
   const { data: billings, isLoading } = useListBillings(queryParams);
+  const { data: clientes } = useListClients();
 
-  const form = useForm<MarkPaidForm>({
+  const markForm = useForm<MarkPaidForm>({
     resolver: zodResolver(markPaidSchema),
     defaultValues: { paidAt: today },
+  });
+
+  const novaForm = useForm<NovaCobrancaForm>({
+    resolver: zodResolver(novaCobrancaSchema),
+    defaultValues: {
+      clientId: 0,
+      month: now.getMonth() + 1,
+      year: now.getFullYear(),
+    },
   });
 
   function invalidate() {
@@ -82,7 +119,7 @@ export default function ContasReceber() {
   }
 
   function openMarkPaid(id: number) {
-    form.reset({ paidAt: today });
+    markForm.reset({ paidAt: today });
     setMarkingId(id);
   }
 
@@ -94,7 +131,7 @@ export default function ContasReceber() {
         onSuccess: () => {
           invalidate();
           setMarkingId(null);
-          toast({ title: "Pagamento registrado", description: "Cobrança marcada como recebida." });
+          toast({ title: "Recebimento registrado", description: "Cobrança marcada como recebida." });
         },
         onError: () =>
           toast({ title: "Erro", description: "Não foi possível registrar o recebimento.", variant: "destructive" }),
@@ -102,9 +139,26 @@ export default function ContasReceber() {
     );
   }
 
+  function handleNovaCob(values: NovaCobrancaForm) {
+    createBilling.mutate(
+      { data: values },
+      {
+        onSuccess: () => {
+          invalidate();
+          setIsNovaCobrancaOpen(false);
+          novaForm.reset();
+          toast({ title: "Cobrança gerada", description: "O fechamento mensal foi criado com sucesso." });
+        },
+        onError: (e: any) => {
+          const msg = e?.response?.data?.error ?? "Não foi possível gerar a cobrança.";
+          toast({ title: "Erro", description: msg, variant: "destructive" });
+        },
+      }
+    );
+  }
+
   const markingBilling = billings?.find((b) => b.id === markingId);
 
-  // Compute overdue client-side (API returns "pendente" for overdue in DB)
   const enriched = (billings ?? []).map((b) => ({
     ...b,
     displayStatus: b.status === "pendente" && b.dueDate < today ? "atrasado" : b.status,
@@ -118,7 +172,6 @@ export default function ContasReceber() {
     .reduce((s, b) => s + b.totalAmount, 0);
   const countPendente = enriched.filter((b) => b.displayStatus === "pendente" || b.displayStatus === "atrasado").length;
 
-  // Client breakdown (only pending/overdue)
   const byClient: Record<string, { name: string; total: number; count: number }> = {};
   enriched
     .filter((b) => b.displayStatus !== "pago")
@@ -137,9 +190,12 @@ export default function ContasReceber() {
           <h1 className="text-3xl font-bold tracking-tight">Contas a Receber</h1>
           <p className="text-muted-foreground">Faturas e cobranças pendentes de recebimento</p>
         </div>
+        <Button onClick={() => setIsNovaCobrancaOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" /> Nova Cobrança
+        </Button>
       </div>
 
-      {/* Filters */}
+      {/* Filtros */}
       <div className="flex flex-wrap items-center gap-3">
         <PeriodFilter value={period} onChange={setPeriod} />
         <div className="flex rounded-lg border bg-background text-sm overflow-hidden">
@@ -160,7 +216,7 @@ export default function ContasReceber() {
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
@@ -203,7 +259,84 @@ export default function ContasReceber() {
         </Card>
       </div>
 
-      {/* Mark as Received Dialog */}
+      {/* Dialog — Nova Cobrança */}
+      <Dialog open={isNovaCobrancaOpen} onOpenChange={(o) => { if (!o) novaForm.reset(); setIsNovaCobrancaOpen(o); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nova Cobrança</DialogTitle>
+            <DialogDescription>
+              Gera um fechamento mensal com honorário + despesas a repassar do período.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...novaForm}>
+            <form onSubmit={novaForm.handleSubmit(handleNovaCob)} className="space-y-4">
+              <FormField
+                control={novaForm.control}
+                name="clientId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cliente</FormLabel>
+                    <Select
+                      value={field.value ? String(field.value) : ""}
+                      onValueChange={(v) => field.onChange(Number(v))}
+                    >
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {clientes?.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={novaForm.control}
+                  name="month"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Mês</FormLabel>
+                      <Select value={String(field.value)} onValueChange={(v) => field.onChange(Number(v))}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {MESES.map((m) => (
+                            <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={novaForm.control}
+                  name="year"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ano</FormLabel>
+                      <FormControl><Input type="number" min="2020" max="2099" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button type="submit" disabled={createBilling.isPending}>
+                  {createBilling.isPending ? "Gerando..." : "Gerar Cobrança"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog — Registrar Recebimento */}
       <Dialog open={!!markingId} onOpenChange={(o) => { if (!o) setMarkingId(null); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -214,10 +347,10 @@ export default function ContasReceber() {
                 : ""}
             </DialogDescription>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleMarkPaid)} className="space-y-4">
+          <Form {...markForm}>
+            <form onSubmit={markForm.handleSubmit(handleMarkPaid)} className="space-y-4">
               <FormField
-                control={form.control}
+                control={markForm.control}
                 name="paidAt"
                 render={({ field }) => (
                   <FormItem>
@@ -246,7 +379,7 @@ export default function ContasReceber() {
       </Dialog>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main table */}
+        {/* Tabela principal */}
         <div className="lg:col-span-2">
           <Card>
             <CardContent className="p-0">
@@ -277,7 +410,7 @@ export default function ContasReceber() {
                       <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                         <div className="flex flex-col items-center gap-2">
                           <CheckCircle2 className="h-8 w-8 text-green-500 opacity-60" />
-                          <span>Nenhuma conta a receber pendente. Tudo em dia!</span>
+                          <span>Nenhuma cobrança encontrada para o período.</span>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -349,7 +482,7 @@ export default function ContasReceber() {
           </Card>
         </div>
 
-        {/* Client breakdown sidebar */}
+        {/* Sidebar — pendente por cliente */}
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
