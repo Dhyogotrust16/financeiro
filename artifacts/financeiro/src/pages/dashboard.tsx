@@ -2,7 +2,7 @@ import { useGetDashboardSummary, useGetDashboardCashflow, useGetClientProfitabil
 import { formatCurrency } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, AreaChart, Area, CartesianGrid } from "recharts";
-import { ArrowDownIcon, ArrowUpIcon, CreditCard, DollarSign, Users, AlertCircle } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, CreditCard, DollarSign, Users, AlertCircle, Wallet } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Dashboard() {
@@ -225,6 +225,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
-// Ensure Wallet is imported
-import { Wallet } from "lucide-react";

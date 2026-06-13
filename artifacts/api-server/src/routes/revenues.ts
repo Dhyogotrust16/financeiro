@@ -66,7 +66,10 @@ router.patch("/:id", requireAuth, async (req, res) => {
   if (status !== undefined) updates.status = status;
   const [row] = await db.update(revenuesTable).set(updates).where(and(eq(revenuesTable.id, id), eq(revenuesTable.userId, userId))).returning();
   if (!row) return res.status(404).json({ error: "Not found" });
-  return res.json(formatRevenue(row, null));
+  const [client] = row.clientId
+    ? await db.select({ name: clientsTable.name }).from(clientsTable).where(eq(clientsTable.id, row.clientId))
+    : [];
+  return res.json(formatRevenue(row, client?.name ?? null));
 });
 
 router.delete("/:id", requireAuth, async (req, res) => {

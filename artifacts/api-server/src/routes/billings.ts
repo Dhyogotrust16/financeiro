@@ -42,7 +42,8 @@ router.post("/", requireAuth, async (req, res) => {
 
   // Get passable expenses for this client and month
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-  const endDate = `${year}-${String(month).padStart(2, "0")}-31`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
   const expenses = await db.select().from(expensesTable).where(
     and(

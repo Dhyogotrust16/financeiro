@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, revenuesTable, expensesTable, clientsTable, billingsTable } from "@workspace/db";
+import { db, revenuesTable, expensesTable, clientsTable, billingsTable, payablesTable } from "@workspace/db";
 import { eq, and, sql, count } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
@@ -11,7 +11,8 @@ router.get("/summary/:year/:month", requireAuth, async (req, res) => {
   const month = Number(req.params.month);
 
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-  const endDate = `${year}-${String(month).padStart(2, "0")}-31`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
   // Total revenues for the month
   const revenueRows = await db.select({ amount: revenuesTable.amount }).from(revenuesTable)
@@ -32,10 +33,10 @@ router.get("/summary/:year/:month", requireAuth, async (req, res) => {
     .where(and(eq(billingsTable.userId, userId), eq(billingsTable.status, "pendente")));
   const pendingReceivables = pendingBillings.reduce((s, b) => s + parseFloat(b.amount), 0);
 
-  // Pending payables (expenses not passed to client)
-  const payableRows = await db.select({ amount: expensesTable.amount }).from(expensesTable)
-    .where(and(eq(expensesTable.userId, userId), eq(expensesTable.passToClient, false)));
-  const pendingPayables = payableRows.reduce((s, e) => s + parseFloat(e.amount), 0);
+  // Pending payables (unpaid entries in payables table)
+  const payableRows = await db.select({ amount: payablesTable.amount }).from(payablesTable)
+    .where(and(eq(payablesTable.userId, userId), eq(payablesTable.status, "pendente")));
+  const pendingPayables = payableRows.reduce((s, p) => s + parseFloat(p.amount), 0);
 
   // Overdue billings
   const now = new Date().toISOString().split("T")[0];
@@ -64,7 +65,8 @@ router.get("/cashflow", requireAuth, async (req, res) => {
     const year = d.getFullYear();
     const month = d.getMonth() + 1;
     const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-    const endDate = `${year}-${String(month).padStart(2, "0")}-31`;
+    const lastDayOfMonth = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDayOfMonth).padStart(2, "0")}`;
 
     const revenueRows = await db.select({ amount: revenuesTable.amount }).from(revenuesTable)
       .where(and(eq(revenuesTable.userId, userId), eq(revenuesTable.status, "recebido"), sql`${revenuesTable.date} >= ${startDate}`, sql`${revenuesTable.date} <= ${endDate}`));

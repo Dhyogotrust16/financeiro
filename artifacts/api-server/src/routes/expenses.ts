@@ -70,7 +70,13 @@ router.patch("/:id", requireAuth, async (req, res) => {
   if (passToClient !== undefined) updates.passToClient = passToClient;
   const [row] = await db.update(expensesTable).set(updates).where(and(eq(expensesTable.id, id), eq(expensesTable.userId, userId))).returning();
   if (!row) return res.status(404).json({ error: "Not found" });
-  return res.json(formatExpense(row, null, null));
+  const [clientRow] = row.clientId
+    ? await db.select({ name: clientsTable.name }).from(clientsTable).where(eq(clientsTable.id, row.clientId))
+    : [];
+  const [categoryRow] = row.categoryId
+    ? await db.select({ name: categoriesTable.name }).from(categoriesTable).where(eq(categoriesTable.id, row.categoryId))
+    : [];
+  return res.json(formatExpense(row, clientRow?.name ?? null, categoryRow?.name ?? null));
 });
 
 router.delete("/:id", requireAuth, async (req, res) => {
