@@ -21,61 +21,61 @@ export default function Dashboard() {
         <p className="text-muted-foreground">Visão geral financeira de {currentMonth}/{currentYear}</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Receita Total</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-1">
             {isLoadingSummary ? (
-              <Skeleton className="h-7 w-24" />
+              <Skeleton className="h-7 w-28" />
             ) : (
-              <div className="text-xl font-bold text-green-600 dark:text-green-500 truncate">
+              <div className="text-xl font-bold text-green-600 dark:text-green-500">
                 {formatCurrency(summary?.totalRevenue || 0)}
               </div>
             )}
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Despesas</CardTitle>
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-1">
             {isLoadingSummary ? (
-              <Skeleton className="h-7 w-24" />
+              <Skeleton className="h-7 w-28" />
             ) : (
-              <div className="text-xl font-bold text-red-600 dark:text-red-500 truncate">
+              <div className="text-xl font-bold text-red-600 dark:text-red-500">
                 {formatCurrency(summary?.totalExpenses || 0)}
               </div>
             )}
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Balanço</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-1">
             {isLoadingSummary ? (
-              <Skeleton className="h-7 w-24" />
+              <Skeleton className="h-7 w-28" />
             ) : (
-              <div className="text-xl font-bold truncate">
+              <div className="text-xl font-bold">
                 {formatCurrency(summary?.balance || 0)}
               </div>
             )}
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-1">
             {isLoadingSummary ? (
               <Skeleton className="h-8 w-16" />
             ) : (
@@ -95,7 +95,7 @@ export default function Dashboard() {
             {isLoadingSummary ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-xl font-bold text-amber-700 dark:text-amber-300 truncate">
+              <div className="text-xl font-bold text-amber-700 dark:text-amber-300">
                 {formatCurrency(summary?.pendingReceivables || 0)}
               </div>
             )}
@@ -111,7 +111,7 @@ export default function Dashboard() {
             {isLoadingSummary ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-xl font-bold text-blue-700 dark:text-blue-300 truncate">
+              <div className="text-xl font-bold text-blue-700 dark:text-blue-300">
                 {formatCurrency(summary?.pendingPayables || 0)}
               </div>
             )}
