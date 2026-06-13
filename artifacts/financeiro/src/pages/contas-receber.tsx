@@ -4,6 +4,7 @@ import {
   useMarkBillingPaid,
   getListBillingsQueryKey,
 } from "@workspace/api-client-react";
+import { PeriodFilter, periodToDates, type PeriodValue } from "@/components/period-filter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -51,10 +52,13 @@ export default function ContasReceber() {
   const markBillingPaid = useMarkBillingPaid();
 
   const [markingId, setMarkingId] = useState<number | null>(null);
+  const [period, setPeriod] = useState<PeriodValue | null>(null);
+
+  const periodParams = period ? periodToDates(period) : {};
 
   // Load pending + overdue separately so we get both
-  const { data: pending, isLoading: isPendingLoading } = useListBillings({ status: "pendente" });
-  const { data: overdue, isLoading: isOverdueLoading } = useListBillings({ status: "atrasado" });
+  const { data: pending, isLoading: isPendingLoading } = useListBillings({ status: "pendente", ...periodParams });
+  const { data: overdue, isLoading: isOverdueLoading } = useListBillings({ status: "atrasado", ...periodParams });
 
   const isLoading = isPendingLoading || isOverdueLoading;
 
@@ -103,9 +107,12 @@ export default function ContasReceber() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Contas a Receber</h1>
-        <p className="text-muted-foreground">Faturas e cobranças pendentes de recebimento</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Contas a Receber</h1>
+          <p className="text-muted-foreground">Faturas e cobranças pendentes de recebimento</p>
+        </div>
+        <PeriodFilter value={period} onChange={setPeriod} />
       </div>
 
       {/* Summary Cards */}

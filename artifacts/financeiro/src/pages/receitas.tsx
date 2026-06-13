@@ -7,6 +7,7 @@ import {
   useListClients,
   getListRevenuesQueryKey,
 } from "@workspace/api-client-react";
+import { PeriodFilter, periodToDates, type PeriodValue } from "@/components/period-filter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -232,7 +233,14 @@ function RevenueDialog({
 }
 
 export default function Receitas() {
-  const { data: revenues, isLoading } = useListRevenues();
+  const now = new Date();
+  const [period, setPeriod] = useState<PeriodValue | null>({
+    month: now.getMonth() + 1,
+    year: now.getFullYear(),
+  });
+
+  const periodParams = period ? periodToDates(period) : {};
+  const { data: revenues, isLoading } = useListRevenues(periodParams);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -244,6 +252,9 @@ export default function Receitas() {
   const [editingId, setEditingId] = useState<number | null>(null);
 
   const today = new Date().toISOString().split("T")[0];
+
+  const totalRecebido = revenues?.filter(r => r.status === "recebido").reduce((s, r) => s + r.amount, 0) ?? 0;
+  const totalPendente = revenues?.filter(r => r.status === "pendente").reduce((s, r) => s + r.amount, 0) ?? 0;
 
   const createDefaults: RevenueForm = {
     date: today,
@@ -322,6 +333,20 @@ export default function Receitas() {
         <Button onClick={() => setIsCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" /> Nova Receita
         </Button>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <PeriodFilter value={period} onChange={setPeriod} />
+        {!isLoading && !!revenues?.length && (
+          <div className="flex items-center gap-4 text-sm">
+            <span className="text-muted-foreground">
+              Recebido: <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(totalRecebido)}</span>
+            </span>
+            <span className="text-muted-foreground">
+              Pendente: <span className="font-semibold text-amber-600 dark:text-amber-400">{formatCurrency(totalPendente)}</span>
+            </span>
+          </div>
+        )}
       </div>
 
       <RevenueDialog

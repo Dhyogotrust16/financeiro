@@ -8,6 +8,7 @@ import {
   useListCategories,
   getListExpensesQueryKey,
 } from "@workspace/api-client-react";
+import { PeriodFilter, periodToDates, type PeriodValue } from "@/components/period-filter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -227,7 +228,14 @@ function ExpenseDialog({
 }
 
 export default function Despesas() {
-  const { data: expenses, isLoading } = useListExpenses();
+  const now = new Date();
+  const [period, setPeriod] = useState<PeriodValue | null>({
+    month: now.getMonth() + 1,
+    year: now.getFullYear(),
+  });
+
+  const periodParams = period ? periodToDates(period) : {};
+  const { data: expenses, isLoading } = useListExpenses(periodParams);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -239,6 +247,9 @@ export default function Despesas() {
   const [editingId, setEditingId] = useState<number | null>(null);
 
   const today = new Date().toISOString().split("T")[0];
+
+  const totalDespesas = expenses?.reduce((s, e) => s + e.amount, 0) ?? 0;
+  const totalRepasse = expenses?.filter(e => e.passToClient).reduce((s, e) => s + e.amount, 0) ?? 0;
 
   const createDefaults: ExpenseForm = {
     date: today,
@@ -304,6 +315,22 @@ export default function Despesas() {
         <Button onClick={() => setIsCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" /> Nova Despesa
         </Button>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <PeriodFilter value={period} onChange={setPeriod} />
+        {!isLoading && !!expenses?.length && (
+          <div className="flex items-center gap-4 text-sm">
+            <span className="text-muted-foreground">
+              Total: <span className="font-semibold text-red-600 dark:text-red-400">{formatCurrency(totalDespesas)}</span>
+            </span>
+            {totalRepasse > 0 && (
+              <span className="text-muted-foreground">
+                Repasse: <span className="font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(totalRepasse)}</span>
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <ExpenseDialog
