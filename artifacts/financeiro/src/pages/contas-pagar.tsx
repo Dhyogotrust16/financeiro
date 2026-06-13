@@ -189,7 +189,7 @@ export default function ContasPagar() {
     month: now.getMonth() + 1,
     year: now.getFullYear(),
   });
-  const [statusFilter, setStatusFilter] = useState<"pendente" | "pago" | "">("");
+  const [statusFilter, setStatusFilter] = useState<"pendente" | "pago" | "">("pendente");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [payingId, setPayingId] = useState<number | null>(null);
