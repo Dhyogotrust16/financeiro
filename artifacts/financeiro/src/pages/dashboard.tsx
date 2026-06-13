@@ -29,9 +29,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             {isLoadingSummary ? (
-              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-7 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-green-600 dark:text-green-500">
+              <div className="text-xl font-bold text-green-600 dark:text-green-500 truncate">
                 {formatCurrency(summary?.totalRevenue || 0)}
               </div>
             )}
@@ -45,9 +45,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             {isLoadingSummary ? (
-              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-7 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-red-600 dark:text-red-500">
+              <div className="text-xl font-bold text-red-600 dark:text-red-500 truncate">
                 {formatCurrency(summary?.totalExpenses || 0)}
               </div>
             )}
@@ -61,9 +61,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             {isLoadingSummary ? (
-              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-7 w-24" />
             ) : (
-              <div className="text-2xl font-bold">
+              <div className="text-xl font-bold truncate">
                 {formatCurrency(summary?.balance || 0)}
               </div>
             )}
@@ -95,7 +95,7 @@ export default function Dashboard() {
             {isLoadingSummary ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">
+              <div className="text-xl font-bold text-amber-700 dark:text-amber-300 truncate">
                 {formatCurrency(summary?.pendingReceivables || 0)}
               </div>
             )}
@@ -111,7 +111,7 @@ export default function Dashboard() {
             {isLoadingSummary ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+              <div className="text-xl font-bold text-blue-700 dark:text-blue-300 truncate">
                 {formatCurrency(summary?.pendingPayables || 0)}
               </div>
             )}
