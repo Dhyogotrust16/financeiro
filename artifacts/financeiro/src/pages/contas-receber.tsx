@@ -48,7 +48,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Clock, AlertCircle, Banknote, Users, Plus } from "lucide-react";
+import { CheckCircle2, Clock, Banknote, Users, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
@@ -174,16 +174,9 @@ export default function ContasReceber() {
     .reduce((s, b) => s + b.totalAmount, 0);
   const countPendente = enriched.filter((b) => b.displayStatus === "pendente" || b.displayStatus === "atrasado").length;
 
-  const byClient: Record<string, { name: string; total: number; count: number }> = {};
-  enriched
-    .filter((b) => b.displayStatus !== "pago")
-    .forEach((b) => {
-      const key = b.clientName || "Sem cliente";
-      if (!byClient[key]) byClient[key] = { name: key, total: 0, count: 0 };
-      byClient[key].total += b.totalAmount;
-      byClient[key].count++;
-    });
-  const clientBreakdown = Object.values(byClient).sort((a, b) => b.total - a.total);
+  const clientesComPendencia = new Set(
+    enriched.filter((b) => b.displayStatus !== "pago").map((b) => b.clientName || "Sem cliente")
+  ).size;
 
   return (
     <div className="space-y-6">
@@ -253,7 +246,7 @@ export default function ContasReceber() {
           <CardContent>
             {isLoading ? <Skeleton className="h-7 w-16" /> : (
               <>
-                <p className="text-2xl font-bold">{clientBreakdown.length}</p>
+                <p className="text-2xl font-bold">{clientesComPendencia}</p>
                 <p className="text-xs text-muted-foreground mt-1">com saldo pendente</p>
               </>
             )}
@@ -380,9 +373,8 @@ export default function ContasReceber() {
         </DialogContent>
       </Dialog>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Tabela principal */}
-        <div className="lg:col-span-2 min-w-0">
+      <div>
+        <div className="min-w-0">
           <Card>
             <CardContent className="p-0 overflow-x-auto">
               <Table className="min-w-[500px]">
@@ -480,41 +472,6 @@ export default function ContasReceber() {
           </Card>
         </div>
 
-        {/* Sidebar — pendente por cliente */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-amber-500" />
-                Pendente por Cliente
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {isLoading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-4 w-16" />
-                  </div>
-                ))
-              ) : !clientBreakdown.length ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma pendência</p>
-              ) : (
-                clientBreakdown.map((c) => (
-                  <div key={c.name} className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{c.name}</p>
-                      <p className="text-xs text-muted-foreground">{c.count} cobrança{c.count !== 1 ? "s" : ""}</p>
-                    </div>
-                    <span className="text-sm font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                      {formatCurrency(c.total)}
-                    </span>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
   );
