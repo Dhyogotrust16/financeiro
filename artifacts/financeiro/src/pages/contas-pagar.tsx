@@ -292,15 +292,6 @@ export default function ContasPagar() {
   const totalPago = payables?.filter(p => p.status === "pago").reduce((s, p) => s + p.amount, 0) ?? 0;
   const countPendente = payables?.filter(p => p.status === "pendente").length ?? 0;
 
-  // Category breakdown (only pending)
-  const byCategory: Record<string, { name: string; total: number; count: number }> = {};
-  payables?.filter(p => p.status === "pendente").forEach((p) => {
-    const key = p.categoryName || "Geral";
-    if (!byCategory[key]) byCategory[key] = { name: key, total: 0, count: 0 };
-    byCategory[key].total += p.amount;
-    byCategory[key].count++;
-  });
-  const categories = Object.values(byCategory).sort((a, b) => b.total - a.total);
 
   return (
     <div className="space-y-6">
@@ -370,7 +361,9 @@ export default function ContasPagar() {
           <CardContent>
             {isLoading ? <Skeleton className="h-7 w-16" /> : (
               <>
-                <p className="text-2xl font-bold">{categories.length}</p>
+                <p className="text-2xl font-bold">
+                  {new Set(payables?.filter(p => p.status === "pendente").map(p => p.categoryName || "Geral")).size}
+                </p>
                 <p className="text-xs text-muted-foreground mt-1">categorias pendentes</p>
               </>
             )}
@@ -433,9 +426,8 @@ export default function ContasPagar() {
         </DialogContent>
       </Dialog>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main table */}
-        <div className="lg:col-span-2 min-w-0">
+      <div>
+        <div className="min-w-0">
           <Card>
             <CardContent className="p-0 overflow-x-auto">
               <Table className="min-w-[560px]">
@@ -588,50 +580,6 @@ export default function ContasPagar() {
                   </TableFooter>
                 )}
               </Table>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Category breakdown */}
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">Por Categoria (Pendente)</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {isLoading ? (
-                <div className="p-4 space-y-3">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="flex justify-between">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-4 w-20" />
-                    </div>
-                  ))}
-                </div>
-              ) : !categories.length ? (
-                <p className="px-4 py-6 text-sm text-muted-foreground text-center">Sem contas pendentes</p>
-              ) : (
-                <div className="divide-y">
-                  {categories.map((cat) => (
-                    <div key={cat.name} className="flex items-center justify-between px-4 py-3">
-                      <div>
-                        <p className="text-sm font-medium">{cat.name}</p>
-                        <p className="text-xs text-muted-foreground">{cat.count} conta{cat.count !== 1 ? "s" : ""}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-red-600 dark:text-red-400">
-                          {formatCurrency(cat.total)}
-                        </p>
-                        {totalPendente > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            {((cat.total / totalPendente) * 100).toFixed(0)}%
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>
