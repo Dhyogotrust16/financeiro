@@ -5,6 +5,7 @@ import {
   useCreateBilling,
   useListClients,
   getListBillingsQueryKey,
+  getListRevenuesQueryKey,
 } from "@workspace/api-client-react";
 import { PeriodFilter, periodToDates, type PeriodValue } from "@/components/period-filter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -89,7 +90,7 @@ export default function ContasReceber() {
     month: now.getMonth() + 1,
     year: now.getFullYear(),
   });
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("pendente");
 
   const periodParams = period ? periodToDates(period) : {};
   const queryParams = {
@@ -116,6 +117,7 @@ export default function ContasReceber() {
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: getListBillingsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListRevenuesQueryKey() });
   }
 
   function openMarkPaid(id: number) {

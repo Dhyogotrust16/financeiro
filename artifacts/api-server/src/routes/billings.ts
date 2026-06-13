@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, billingsTable, billingItemsTable, clientsTable, expensesTable } from "@workspace/db";
+import { db, billingsTable, billingItemsTable, clientsTable, expensesTable, revenuesTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
@@ -144,6 +144,22 @@ router.post("/:id/mark-paid", requireAuth, async (req, res) => {
   if (!row) return res.status(404).json({ error: "Not found" });
 
   const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, row.clientId));
+
+  const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+  const monthLabel = monthNames[(row.month ?? 1) - 1] ?? String(row.month);
+  const description = `Honorário ${monthLabel}/${row.year}${client?.name ? ` – ${client.name}` : ""}`;
+  const receivedDate = paidAt ?? new Date().toISOString().slice(0, 10);
+
+  await db.insert(revenuesTable).values({
+    userId,
+    clientId: row.clientId,
+    description,
+    amount: row.totalAmount,
+    date: receivedDate,
+    paymentMethod: "outros",
+    status: "recebido",
+  });
+
   return res.json(formatBilling(row, client?.name ?? null, "pago"));
 });
 
