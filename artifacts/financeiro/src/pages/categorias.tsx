@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { 
   useListCategories, 
-  useCreateCategory, 
+  useCreateCategory,
   useDeleteCategory,
   getListCategoriesQueryKey
 } from "@workspace/api-client-react";
@@ -9,7 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -34,7 +34,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { 
   AlertDialog,
@@ -56,43 +55,110 @@ const categorySchema = z.object({
   color: z.string().optional(),
 });
 
+type CategoryForm = z.infer<typeof categorySchema>;
+
+function CategoryDialog({
+  open,
+  onOpenChange,
+  defaultValues,
+  onSubmit,
+  isPending,
+  title,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  defaultValues: CategoryForm;
+  onSubmit: (v: CategoryForm) => void;
+  isPending: boolean;
+  title: string;
+}) {
+  const form = useForm<CategoryForm>({
+    resolver: zodResolver(categorySchema),
+    defaultValues,
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) form.reset(defaultValues); onOpenChange(o); }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>Categorias organizam suas despesas.</DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ex: Material de Escritório" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="color"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cor</FormLabel>
+                  <div className="flex gap-2">
+                    <FormControl>
+                      <Input type="color" className="w-16 p-1 h-10" {...field} />
+                    </FormControl>
+                    <Input
+                      type="text"
+                      value={field.value}
+                      onChange={field.onChange}
+                      className="flex-1 uppercase font-mono"
+                      placeholder="#000000"
+                    />
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="flex justify-end pt-4">
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Categorias() {
   const { data: categories, isLoading } = useListCategories();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const createCategory = useCreateCategory();
   const deleteCategory = useDeleteCategory();
 
-  const form = useForm<z.infer<typeof categorySchema>>({
-    resolver: zodResolver(categorySchema),
-    defaultValues: {
-      name: "",
-      color: "#3b82f6",
-    },
-  });
+  const createDefaults: CategoryForm = { name: "", color: "#3b82f6" };
 
-  function onSubmit(values: z.infer<typeof categorySchema>) {
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: getListCategoriesQueryKey() });
+  }
+
+  function handleCreate(values: CategoryForm) {
     createCategory.mutate(
       { data: values },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListCategoriesQueryKey() });
-          setIsDialogOpen(false);
-          form.reset();
-          toast({
-            title: "Categoria criada",
-            description: "A categoria foi adicionada com sucesso.",
-          });
+          invalidate();
+          setIsCreateOpen(false);
+          toast({ title: "Categoria criada", description: "A categoria foi adicionada com sucesso." });
         },
-        onError: () => {
-          toast({
-            title: "Erro",
-            description: "Não foi possível criar a categoria.",
-            variant: "destructive",
-          });
-        },
+        onError: () => toast({ title: "Erro", description: "Não foi possível criar a categoria.", variant: "destructive" }),
       }
     );
   }
@@ -102,19 +168,10 @@ export default function Categorias() {
       { id },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListCategoriesQueryKey() });
-          toast({
-            title: "Categoria excluída",
-            description: "A categoria foi removida com sucesso.",
-          });
+          invalidate();
+          toast({ title: "Categoria excluída" });
         },
-        onError: () => {
-          toast({
-            title: "Erro",
-            description: "Não foi possível excluir a categoria. Ela pode estar em uso.",
-            variant: "destructive",
-          });
-        },
+        onError: () => toast({ title: "Erro", description: "Não foi possível excluir. A categoria pode estar em uso.", variant: "destructive" }),
       }
     );
   }
@@ -126,67 +183,19 @@ export default function Categorias() {
           <h1 className="text-3xl font-bold tracking-tight">Categorias</h1>
           <p className="text-muted-foreground">Gerencie as categorias de despesas do sistema</p>
         </div>
-        
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> Nova Categoria
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Nova Categoria</DialogTitle>
-              <DialogDescription>
-                Adicione uma nova categoria para classificar despesas.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Material de Escritório" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="color"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cor</FormLabel>
-                      <div className="flex gap-2">
-                        <FormControl>
-                          <Input type="color" className="w-16 p-1 h-10" {...field} />
-                        </FormControl>
-                        <Input 
-                          type="text" 
-                          value={field.value} 
-                          onChange={field.onChange}
-                          className="flex-1 uppercase font-mono" 
-                          placeholder="#000000"
-                        />
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="flex justify-end pt-4">
-                  <Button type="submit" disabled={createCategory.isPending}>
-                    {createCategory.isPending ? "Salvando..." : "Salvar"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setIsCreateOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" /> Nova Categoria
+        </Button>
       </div>
+
+      <CategoryDialog
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        defaultValues={createDefaults}
+        onSubmit={handleCreate}
+        isPending={createCategory.isPending}
+        title="Nova Categoria"
+      />
 
       <Card>
         <CardContent className="p-0">
@@ -217,7 +226,7 @@ export default function Categorias() {
                 categories?.map((category) => (
                   <TableRow key={category.id}>
                     <TableCell>
-                      <div 
+                      <div
                         className="w-6 h-6 rounded-full flex items-center justify-center border"
                         style={{ backgroundColor: category.color || '#e5e7eb' }}
                       >
@@ -228,7 +237,11 @@ export default function Categorias() {
                     <TableCell className="text-right">
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </AlertDialogTrigger>
@@ -236,12 +249,12 @@ export default function Categorias() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Excluir categoria?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Tem certeza que deseja excluir a categoria "{category.name}"? Esta ação não pode ser desfeita.
+                              Tem certeza que deseja excluir "{category.name}"? Esta ação não pode ser desfeita.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction 
+                            <AlertDialogAction
                               onClick={() => handleDelete(category.id)}
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
