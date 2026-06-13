@@ -5,6 +5,7 @@ import {
   useUpdateClient,
   useDeleteClient,
   getListClientsQueryKey,
+  getListBillingsQueryKey,
   ClientInput
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -249,6 +250,7 @@ export default function Clientes() {
       {
         onSuccess: () => {
           invalidate();
+          queryClient.invalidateQueries({ queryKey: getListBillingsQueryKey() });
           setIsCreateOpen(false);
           toast({ title: "Cliente criado", description: "O cliente foi adicionado com sucesso." });
         },
