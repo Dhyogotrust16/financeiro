@@ -460,7 +460,7 @@ export default function ContasPagar() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    payables.map((payable) => {
+                    (Array.isArray(payables) ? payables : []).map((payable) => {
                       const isOverdue = payable.status === "pendente" && payable.dueDate < today;
                       const editDefaults: PayableForm = {
                         description: payable.description,

@@ -148,7 +148,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={cashflow || []} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <AreaChart data={Array.isArray(cashflow) ? cashflow : []} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#16a34a" stopOpacity={0.3}/>
@@ -198,7 +198,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={(profitability || []).slice(0, 5)} layout="vertical" margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <BarChart data={(Array.isArray(profitability) ? profitability : []).slice(0, 5)} layout="vertical" margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
                   <XAxis type="number" hide />
                   <YAxis 

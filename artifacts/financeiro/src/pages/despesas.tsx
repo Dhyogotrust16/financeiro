@@ -248,8 +248,8 @@ export default function Despesas() {
 
   const today = new Date().toISOString().split("T")[0];
 
-  const totalDespesas = expenses?.reduce((s, e) => s + e.amount, 0) ?? 0;
-  const totalRepasse = expenses?.filter(e => e.passToClient).reduce((s, e) => s + e.amount, 0) ?? 0;
+  const totalDespesas = (Array.isArray(expenses) ? expenses : []).reduce((s, e) => s + e.amount, 0);
+  const totalRepasse = (Array.isArray(expenses) ? expenses : []).filter(e => e.passToClient).reduce((s, e) => s + e.amount, 0);
 
   const createDefaults: ExpenseForm = {
     date: today,
@@ -371,7 +371,7 @@ export default function Despesas() {
                   </TableCell>
                 </TableRow>
               ) : (
-                expenses.map((expense) => {
+                (Array.isArray(expenses) ? expenses : []).map((expense) => {
                   const editDefaults: ExpenseForm = {
                     date: expense.date,
                     description: expense.description,

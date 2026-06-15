@@ -253,8 +253,8 @@ export default function Receitas() {
 
   const today = new Date().toISOString().split("T")[0];
 
-  const totalRecebido = revenues?.filter(r => r.status === "recebido").reduce((s, r) => s + r.amount, 0) ?? 0;
-  const totalPendente = revenues?.filter(r => r.status === "pendente").reduce((s, r) => s + r.amount, 0) ?? 0;
+  const totalRecebido = (Array.isArray(revenues) ? revenues : []).filter(r => r.status === "recebido").reduce((s, r) => s + r.amount, 0);
+  const totalPendente = (Array.isArray(revenues) ? revenues : []).filter(r => r.status === "pendente").reduce((s, r) => s + r.amount, 0);
 
   const createDefaults: RevenueForm = {
     date: today,
@@ -388,7 +388,7 @@ export default function Receitas() {
                   </TableCell>
                 </TableRow>
               ) : (
-                revenues.map((revenue) => {
+                (Array.isArray(revenues) ? revenues : []).map((revenue) => {
                   const editDefaults: RevenueForm = {
                     date: revenue.date,
                     description: revenue.description,

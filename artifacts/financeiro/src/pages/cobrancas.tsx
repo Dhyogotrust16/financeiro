@@ -60,7 +60,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, CheckCircle2, FileDown, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@clerk/react";
+import { useAuth } from "@/lib/auth";
 
 const billingSchema = z.object({
   clientId: z.coerce.number().min(1, "Selecione um cliente"),
@@ -296,7 +296,7 @@ export default function Cobrancas() {
                   </TableCell>
                 </TableRow>
               ) : (
-                billings.map((billing) => (
+                (Array.isArray(billings) ? billings : []).map((billing) => (
                   <TableRow key={billing.id}>
                     <TableCell className="font-medium">{billing.month}/{billing.year}</TableCell>
                     <TableCell>{billing.clientName}</TableCell>

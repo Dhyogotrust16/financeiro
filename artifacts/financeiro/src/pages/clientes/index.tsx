@@ -224,7 +224,7 @@ export default function Clientes() {
   const updateClient = useUpdateClient();
   const deleteClient = useDeleteClient();
 
-  const filteredClients = clients?.filter(c => 
+  const filteredClients = (Array.isArray(clients) ? clients : []).filter(c =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.document?.toLowerCase().includes(searchTerm.toLowerCase())
   );

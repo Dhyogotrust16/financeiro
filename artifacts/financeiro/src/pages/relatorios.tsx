@@ -33,7 +33,7 @@ export default function Relatorios() {
                 {isLoadingProfitability ? (
                   <TableRow><TableCell colSpan={3}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
                 ) : (
-                  profitability?.map(p => (
+                  (Array.isArray(profitability) ? profitability : []).map(p => (
                     <TableRow key={p.clientId}>
                       <TableCell className="font-medium">{p.clientName}</TableCell>
                       <TableCell className="text-right">{formatCurrency(p.totalBilled)}</TableCell>
@@ -64,7 +64,7 @@ export default function Relatorios() {
                 {isLoadingCashflow ? (
                   <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
                 ) : (
-                  cashflow?.map((c, i) => (
+                  (Array.isArray(cashflow) ? cashflow : []).map((c, i) => (
                     <TableRow key={i}>
                       <TableCell className="font-medium">{c.label}</TableCell>
                       <TableCell className="text-right text-green-600">{formatCurrency(c.revenue)}</TableCell>

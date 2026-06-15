@@ -1,0 +1,5 @@
+backend
+node --env-file=.env --enable-source-maps ./dist/index.mjs
+
+frontend
+npm run dev
