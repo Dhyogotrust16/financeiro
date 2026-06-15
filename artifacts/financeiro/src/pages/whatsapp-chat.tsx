@@ -170,8 +170,8 @@ async function markUnread(cfg: EvoConfig, jid: string) {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-function ContactAvatar({ c, size = 11 }: { c: Pick<Contact, "name" | "isGroup" | "profilePic">; size?: number }) {
-  const sz = `h-${size} w-${size}`;
+function ContactAvatar({ c, size = "md" }: { c: Pick<Contact, "name" | "isGroup" | "profilePic">; size?: "sm" | "md" | "lg" }) {
+  const sz = size === "sm" ? "h-9 w-9" : size === "lg" ? "h-12 w-12" : "h-11 w-11";
   return (
     <Avatar className={`${sz} shrink-0`}>
       {c.profilePic
@@ -479,7 +479,7 @@ function RightPanel({ contact, cfg, allTags, departments, agentName, onUpdate, o
     <div className="w-[260px] shrink-0 border-l border-border flex flex-col bg-background overflow-y-auto">
       {/* Contact card */}
       <div className="flex flex-col items-center gap-2 p-4 border-b border-border text-center">
-        <ContactAvatar c={contact} size={12} />
+        <ContactAvatar c={contact} size="lg" />
         <div>
           <p className="font-semibold text-sm leading-tight">{contact.name}</p>
           <p className="text-xs text-muted-foreground">{contact.phone}</p>
@@ -886,7 +886,7 @@ export default function WhatsAppChat() {
             {/* Header */}
             <div className="flex items-center gap-3 px-4 py-2 bg-[#f0f2f5] dark:bg-[#202c33] border-b border-border shrink-0">
               <Button variant="ghost" size="icon" className="md:hidden h-8 w-8" onClick={() => setMobileView("list")}><ArrowLeft className="h-4 w-4" /></Button>
-              <ContactAvatar c={selected} size={9} />
+              <ContactAvatar c={selected} size="sm" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="font-semibold text-sm truncate">{selected.name}</p>
