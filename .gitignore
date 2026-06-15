@@ -54,3 +54,7 @@ Thumbs.db
 !.env.example
 artifacts/**/.env
 artifacts/**/.env.*
+
+# Large files
+*.zip
+zipFile.zip
