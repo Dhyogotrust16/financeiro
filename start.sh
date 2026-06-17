@@ -8,7 +8,7 @@ set -e
 
 echo "==> Buildando frontend..."
 cd artifacts/financeiro
-npm run build
+pnpm run build
 cd ../..
 
 echo "==> Buildando backend..."
