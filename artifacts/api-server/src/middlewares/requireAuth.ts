@@ -1,18 +1,47 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Request, Response, NextFunction } from "express";
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+let supabaseClient: ReturnType<typeof createClient> | null = null;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set");
+function getSupabaseClient() {
+  const supabaseUrl =
+    process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_ANON_KEY ??
+    process.env.VITE_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    return null;
+  }
+
+  if (!supabaseClient) {
+    supabaseClient = createClient(supabaseUrl, supabaseKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+
+  return supabaseClient;
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+export function isSupabaseAuthConfigured(): boolean {
+  return Boolean(
+    (process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL) &&
+      (process.env.SUPABASE_SERVICE_ROLE_KEY ??
+        process.env.SUPABASE_ANON_KEY ??
+        process.env.VITE_SUPABASE_ANON_KEY),
+  );
+}
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    res.status(503).json({
+      error: "Supabase auth is not configured",
+    });
+    return;
+  }
+
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
