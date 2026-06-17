@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { format } from "date-fns";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -64,20 +65,20 @@ import { useAuth } from "@/lib/auth";
 
 const billingSchema = z.object({
   clientId: z.coerce.number().min(1, "Selecione um cliente"),
-  month: z.coerce.number().min(1).max(12),
-  year: z.coerce.number().min(2020).max(2099),
+  amount: z.coerce.number().min(0.01, "Informe um valor maior que zero"),
+  dueDate: z.string().min(1, "Selecione a data de vencimento"),
 });
 
 type BillingForm = z.infer<typeof billingSchema>;
 
-const MONTHS = [
-  { value: 1, label: "Janeiro" }, { value: 2, label: "Fevereiro" },
-  { value: 3, label: "Março" }, { value: 4, label: "Abril" },
-  { value: 5, label: "Maio" }, { value: 6, label: "Junho" },
-  { value: 7, label: "Julho" }, { value: 8, label: "Agosto" },
-  { value: 9, label: "Setembro" }, { value: 10, label: "Outubro" },
-  { value: 11, label: "Novembro" }, { value: 12, label: "Dezembro" },
-];
+function getBillingDefaults(): BillingForm {
+  const now = new Date();
+  return {
+    clientId: 0,
+    amount: 0,
+    dueDate: format(now, "yyyy-MM-dd"),
+  };
+}
 
 export default function Cobrancas() {
   const { data: billings, isLoading } = useListBillings();
@@ -93,14 +94,9 @@ export default function Cobrancas() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
-  const now = new Date();
   const form = useForm<BillingForm>({
     resolver: zodResolver(billingSchema),
-    defaultValues: {
-      clientId: 0,
-      month: now.getMonth() + 1,
-      year: now.getFullYear(),
-    },
+    defaultValues: getBillingDefaults(),
   });
 
   function invalidate() {
@@ -109,13 +105,13 @@ export default function Cobrancas() {
 
   function handleCreate(values: BillingForm) {
     createBilling.mutate(
-      { data: values },
+      { data: { clientId: values.clientId, dueDate: values.dueDate, amount: values.amount } },
       {
         onSuccess: () => {
           invalidate();
           setIsCreateOpen(false);
-          form.reset();
-          toast({ title: "Cobrança gerada", description: "O fechamento mensal foi criado com sucesso." });
+          form.reset(getBillingDefaults());
+          toast({ title: "Cobrança gerada", description: "A conta a receber foi criada com sucesso." });
         },
         onError: (e: any) => {
           const msg = e?.response?.data?.error ?? "Não foi possível gerar a cobrança.";
@@ -152,7 +148,7 @@ export default function Cobrancas() {
     );
   }
 
-  async function handleDownloadPdf(billingId: number, clientName: string | null, month: number, year: number) {
+  async function handleDownloadPdf(billingId: number, label: string | null, month: number, year: number) {
     setDownloadingId(billingId);
     try {
       const token = await getToken();
@@ -164,7 +160,7 @@ export default function Cobrancas() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `cobranca-${(clientName ?? "cliente").replace(/\s+/g, "-").toLowerCase()}-${month}-${year}.pdf`;
+      a.download = `cobranca-${(label ?? "cobranca").replace(/\s+/g, "-").toLowerCase()}-${month}-${year}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -189,12 +185,12 @@ export default function Cobrancas() {
         </Button>
       </div>
 
-      <Dialog open={isCreateOpen} onOpenChange={(o) => { if (!o) form.reset(); setIsCreateOpen(o); }}>
-        <DialogContent className="max-w-sm">
+      <Dialog open={isCreateOpen} onOpenChange={(o) => { if (!o) form.reset(getBillingDefaults()); setIsCreateOpen(o); }}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Nova Cobrança</DialogTitle>
             <DialogDescription>
-              Gera um fechamento mensal com honorário + despesas a repassar do período.
+              Preencha os dados da cobrança e defina o vencimento.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -225,31 +221,26 @@ export default function Cobrancas() {
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="month"
+                  name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Mês</FormLabel>
-                      <Select value={String(field.value)} onValueChange={(v) => field.onChange(Number(v))}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {MONTHS.map((m) => (
-                            <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>Valor (R$)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" min="0.01" placeholder="0,00" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
                 <FormField
                   control={form.control}
-                  name="year"
+                  name="dueDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Ano</FormLabel>
-                      <FormControl><Input type="number" min="2020" max="2099" {...field} /></FormControl>
+                      <FormLabel>Vencimento</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -273,7 +264,7 @@ export default function Cobrancas() {
                 <TableHead>Mês/Ano</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Vencimento</TableHead>
-                <TableHead className="text-right">Honorário</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
                 <TableHead className="text-right">Despesas</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead>Status</TableHead>
@@ -299,7 +290,7 @@ export default function Cobrancas() {
                 (Array.isArray(billings) ? billings : []).map((billing) => (
                   <TableRow key={billing.id}>
                     <TableCell className="font-medium">{billing.month}/{billing.year}</TableCell>
-                    <TableCell>{billing.clientName}</TableCell>
+                    <TableCell>{billing.clientName ?? billing.description ?? "-"}</TableCell>
                     <TableCell>{formatDate(billing.dueDate)}</TableCell>
                     <TableCell className="text-right text-muted-foreground">{formatCurrency(billing.monthlyFee)}</TableCell>
                     <TableCell className="text-right text-muted-foreground">{formatCurrency(billing.expensesTotal)}</TableCell>
@@ -337,7 +328,7 @@ export default function Cobrancas() {
                           className="h-8 w-8"
                           title="Baixar PDF"
                           disabled={downloadingId === billing.id}
-                          onClick={() => handleDownloadPdf(billing.id, billing.clientName ?? null, billing.month, billing.year)}
+                          onClick={() => handleDownloadPdf(billing.id, billing.clientName ?? billing.description ?? null, billing.month, billing.year)}
                         >
                           {downloadingId === billing.id
                             ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -358,7 +349,7 @@ export default function Cobrancas() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Excluir cobrança?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  A cobrança de {billing.month}/{billing.year} para {billing.clientName} será excluída e as despesas serão liberadas.
+                                  A cobrança de {billing.month}/{billing.year} para {billing.clientName ?? billing.description ?? "este lançamento"} será excluída e as despesas serão liberadas.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>

@@ -7,7 +7,11 @@
  */
 
 export interface BillingInput {
-  clientId: number;
-  month: number;
-  year: number;
+  /** @nullable */
+  clientId?: number | null;
+  description?: string;
+  /** @nullable */
+  categoryId?: number | null;
+  dueDate: Date;
+  amount: number;
 }

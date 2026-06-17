@@ -8,14 +8,15 @@ const router = Router();
 router.get("/", requireAuth, async (req, res) => {
   const userId = (req as any).userId;
   const rows = await db.select().from(categoriesTable).where(eq(categoriesTable.userId, userId));
-  res.json(rows.map(r => ({ id: r.id, name: r.name, color: r.color ?? null })));
+  res.json(rows.map((r) => ({ id: r.id, name: r.name, type: r.type ?? "despesa" })));
 });
 
 router.post("/", requireAuth, async (req, res) => {
   const userId = (req as any).userId;
-  const { name, color } = req.body;
-  const [row] = await db.insert(categoriesTable).values({ userId, name, color }).returning();
-  res.status(201).json({ id: row.id, name: row.name, color: row.color ?? null });
+  const { name, type } = req.body;
+  const normalizedType = type === "receita" ? "receita" : "despesa";
+  const [row] = await db.insert(categoriesTable).values({ userId, name, type: normalizedType }).returning();
+  res.status(201).json({ id: row.id, name: row.name, type: row.type ?? normalizedType });
 });
 
 router.delete("/:id", requireAuth, async (req, res) => {

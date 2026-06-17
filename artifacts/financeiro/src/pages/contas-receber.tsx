@@ -3,7 +3,7 @@ import {
   useListBillings,
   useMarkBillingPaid,
   useCreateBilling,
-  useListClients,
+  useListCategories,
   getListBillingsQueryKey,
   getListRevenuesQueryKey,
 } from "@workspace/api-client-react";
@@ -12,6 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { format } from "date-fns";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Clock, Banknote, Users, Plus } from "lucide-react";
+import { CheckCircle2, Clock, Banknote, Receipt, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
@@ -58,20 +59,22 @@ const markPaidSchema = z.object({
 type MarkPaidForm = z.infer<typeof markPaidSchema>;
 
 const novaCobrancaSchema = z.object({
-  clientId: z.coerce.number().min(1, "Selecione um cliente"),
-  month: z.coerce.number().min(1).max(12),
-  year: z.coerce.number().min(2020).max(2099),
+  description: z.string().min(2, "Descrição obrigatória"),
+  amount: z.coerce.number().min(0.01, "Informe um valor maior que zero"),
+  dueDate: z.string().min(1, "Selecione a data de vencimento"),
+  categoryId: z.coerce.number().optional().nullable(),
 });
 type NovaCobrancaForm = z.infer<typeof novaCobrancaSchema>;
 
-const MESES = [
-  { value: 1, label: "Janeiro" }, { value: 2, label: "Fevereiro" },
-  { value: 3, label: "Março" }, { value: 4, label: "Abril" },
-  { value: 5, label: "Maio" }, { value: 6, label: "Junho" },
-  { value: 7, label: "Julho" }, { value: 8, label: "Agosto" },
-  { value: 9, label: "Setembro" }, { value: 10, label: "Outubro" },
-  { value: 11, label: "Novembro" }, { value: 12, label: "Dezembro" },
-];
+function getNovaCobrancaDefaults(): NovaCobrancaForm {
+  const now = new Date();
+  return {
+    description: "",
+    amount: 0,
+    dueDate: format(now, "yyyy-MM-dd"),
+    categoryId: null,
+  };
+}
 
 type StatusFilter = "" | "pendente" | "pago";
 
@@ -99,7 +102,8 @@ export default function ContasReceber() {
   };
 
   const { data: billings, isLoading } = useListBillings(queryParams);
-  const { data: clientes } = useListClients();
+  const { data: categories } = useListCategories();
+  const revenueCategories = categories?.filter((category) => category.type === "receita") ?? [];
 
   const markForm = useForm<MarkPaidForm>({
     resolver: zodResolver(markPaidSchema),
@@ -108,11 +112,7 @@ export default function ContasReceber() {
 
   const novaForm = useForm<NovaCobrancaForm>({
     resolver: zodResolver(novaCobrancaSchema),
-    defaultValues: {
-      clientId: 0,
-      month: now.getMonth() + 1,
-      year: now.getFullYear(),
-    },
+    defaultValues: getNovaCobrancaDefaults(),
   });
 
   function invalidate() {
@@ -143,13 +143,13 @@ export default function ContasReceber() {
 
   function handleNovaCob(values: NovaCobrancaForm) {
     createBilling.mutate(
-      { data: values },
+      { data: { description: values.description, dueDate: values.dueDate, amount: values.amount, categoryId: values.categoryId ?? undefined } },
       {
         onSuccess: () => {
           invalidate();
           setIsNovaCobrancaOpen(false);
-          novaForm.reset();
-          toast({ title: "Cobrança gerada", description: "O fechamento mensal foi criado com sucesso." });
+          novaForm.reset(getNovaCobrancaDefaults());
+          toast({ title: "Cobrança gerada", description: "A conta a receber foi criada com sucesso." });
         },
         onError: (e: any) => {
           const msg = e?.response?.data?.error ?? "Não foi possível gerar a cobrança.";
@@ -174,8 +174,8 @@ export default function ContasReceber() {
     .reduce((s, b) => s + b.totalAmount, 0);
   const countPendente = enriched.filter((b) => b.displayStatus === "pendente" || b.displayStatus === "atrasado").length;
 
-  const clientesComPendencia = new Set(
-    enriched.filter((b) => b.displayStatus !== "pago").map((b) => b.clientName || "Sem cliente")
+  const categoriasComPendencia = new Set(
+    enriched.filter((b) => b.displayStatus !== "pago" && b.categoryName).map((b) => b.categoryName as string)
   ).size;
 
   return (
@@ -240,13 +240,13 @@ export default function ContasReceber() {
         </Card>
         <Card>
           <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Clientes</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Categorias</CardTitle>
+            <Receipt className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {isLoading ? <Skeleton className="h-7 w-16" /> : (
               <>
-                <p className="text-2xl font-bold">{clientesComPendencia}</p>
+                <p className="text-2xl font-bold">{categoriasComPendencia}</p>
                 <p className="text-xs text-muted-foreground mt-1">com saldo pendente</p>
               </>
             )}
@@ -255,35 +255,25 @@ export default function ContasReceber() {
       </div>
 
       {/* Dialog — Nova Cobrança */}
-      <Dialog open={isNovaCobrancaOpen} onOpenChange={(o) => { if (!o) novaForm.reset(); setIsNovaCobrancaOpen(o); }}>
-        <DialogContent className="max-w-sm">
+      <Dialog open={isNovaCobrancaOpen} onOpenChange={(o) => { if (!o) novaForm.reset(getNovaCobrancaDefaults()); setIsNovaCobrancaOpen(o); }}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Nova Cobrança</DialogTitle>
             <DialogDescription>
-              Gera um fechamento mensal com honorário + despesas a repassar do período.
+              Preencha os dados da conta a receber.
             </DialogDescription>
           </DialogHeader>
           <Form {...novaForm}>
             <form onSubmit={novaForm.handleSubmit(handleNovaCob)} className="space-y-4">
               <FormField
                 control={novaForm.control}
-                name="clientId"
+                name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cliente</FormLabel>
-                    <Select
-                      value={field.value ? String(field.value) : ""}
-                      onValueChange={(v) => field.onChange(Number(v))}
-                    >
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {clientes?.map((c) => (
-                          <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Descrição</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Honorário, Serviço, Venda" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -291,36 +281,55 @@ export default function ContasReceber() {
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={novaForm.control}
-                  name="month"
+                  name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Mês</FormLabel>
-                      <Select value={String(field.value)} onValueChange={(v) => field.onChange(Number(v))}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {MESES.map((m) => (
-                            <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>Valor (R$)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" min="0.01" placeholder="0,00" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
                 <FormField
                   control={novaForm.control}
-                  name="year"
+                  name="dueDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Ano</FormLabel>
-                      <FormControl><Input type="number" min="2020" max="2099" {...field} /></FormControl>
+                      <FormLabel>Vencimento</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+              <FormField
+                control={novaForm.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Categoria</FormLabel>
+                    <Select
+                      value={field.value ? String(field.value) : "none"}
+                      onValueChange={(v) => field.onChange(v === "none" ? null : Number(v))}
+                    >
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Sem categoria" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Sem categoria</SelectItem>
+                        {revenueCategories.map((category) => (
+                          <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="flex justify-end pt-2">
                 <Button type="submit" disabled={createBilling.isPending}>
                   {createBilling.isPending ? "Gerando..." : "Gerar Cobrança"}
@@ -338,7 +347,7 @@ export default function ContasReceber() {
             <DialogTitle>Registrar Recebimento</DialogTitle>
             <DialogDescription>
               {markingBilling
-                ? `${markingBilling.clientName} — ${markingBilling.month}/${markingBilling.year} — ${formatCurrency(markingBilling.totalAmount)}`
+                ? `${markingBilling.description ?? markingBilling.clientName ?? "Cobrança"} — ${formatCurrency(markingBilling.totalAmount)}`
                 : ""}
             </DialogDescription>
           </DialogHeader>
@@ -381,8 +390,8 @@ export default function ContasReceber() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Vencimento</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Referência</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Categoria</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-[120px] text-right">Ações</TableHead>
@@ -418,8 +427,8 @@ export default function ContasReceber() {
                           <TableCell className={isOverdue ? "font-medium text-red-600 dark:text-red-400" : ""}>
                             {formatDate(billing.dueDate)}
                           </TableCell>
-                          <TableCell className="font-medium">{billing.clientName}</TableCell>
-                          <TableCell className="text-muted-foreground">{billing.month}/{billing.year}</TableCell>
+                          <TableCell className="font-medium">{billing.description || billing.clientName || "Sem descrição"}</TableCell>
+                          <TableCell className="text-muted-foreground">{billing.categoryName || "Sem categoria"}</TableCell>
                           <TableCell className="text-right font-semibold text-primary">{formatCurrency(billing.totalAmount)}</TableCell>
                           <TableCell>
                             {isPaid ? (

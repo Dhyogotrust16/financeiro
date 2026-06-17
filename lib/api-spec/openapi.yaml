@@ -13,7 +13,7 @@ tags:
   - name: clients
     description: Client management
   - name: categories
-    description: Expense categories
+    description: Revenue and expense categories
   - name: revenues
     description: Revenue management
   - name: expenses
@@ -808,6 +808,7 @@ components:
         - name
         - status
         - monthlyFee
+        - dueDate
         - dueDay
         - createdAt
       properties:
@@ -825,6 +826,8 @@ components:
           type: ["string", "null"]
         monthlyFee:
           type: number
+        dueDate:
+          type: string
         dueDay:
           type: integer
         status:
@@ -840,6 +843,7 @@ components:
       required:
         - name
         - monthlyFee
+        - dueDate
         - dueDay
       properties:
         name:
@@ -854,6 +858,8 @@ components:
           type: string
         monthlyFee:
           type: number
+        dueDate:
+          type: string
         dueDay:
           type: integer
         status:
@@ -878,6 +884,8 @@ components:
           type: string
         monthlyFee:
           type: number
+        dueDate:
+          type: string
         dueDay:
           type: integer
         status:
@@ -923,23 +931,27 @@ components:
       required:
         - id
         - name
+        - type
       properties:
         id:
           type: integer
         name:
           type: string
-        color:
-          type: ["string", "null"]
+        type:
+          type: string
+          enum: [receita, despesa]
 
     CategoryInput:
       type: object
       required:
         - name
+        - type
       properties:
         name:
           type: string
-        color:
+        type:
           type: string
+          enum: [receita, despesa]
 
     # ── REVENUE ───────────────────────────────────────────────────────────────
     Revenue:
@@ -1087,8 +1099,7 @@ components:
       type: object
       required:
         - id
-        - clientId
-        - clientName
+        - description
         - month
         - year
         - dueDate
@@ -1101,9 +1112,15 @@ components:
         id:
           type: integer
         clientId:
-          type: integer
+          type: ["integer", "null"]
         clientName:
+          type: ["string", "null"]
+        description:
           type: string
+        categoryId:
+          type: ["integer", "null"]
+        categoryName:
+          type: ["string", "null"]
         month:
           type: integer
         year:
@@ -1128,8 +1145,7 @@ components:
       type: object
       required:
         - id
-        - clientId
-        - clientName
+        - description
         - month
         - year
         - dueDate
@@ -1143,9 +1159,15 @@ components:
         id:
           type: integer
         clientId:
-          type: integer
+          type: ["integer", "null"]
         clientName:
+          type: ["string", "null"]
+        description:
           type: string
+        categoryId:
+          type: ["integer", "null"]
+        categoryName:
+          type: ["string", "null"]
         month:
           type: integer
         year:
@@ -1189,23 +1211,27 @@ components:
           type: number
         itemType:
           type: string
-          enum: [honorario, despesa]
+          enum: [honorario, despesa, manual]
         expenseId:
           type: ["integer", "null"]
 
     BillingInput:
       type: object
       required:
-        - clientId
-        - month
-        - year
+        - dueDate
+        - amount
       properties:
         clientId:
-          type: integer
-        month:
-          type: integer
-        year:
-          type: integer
+          type: ["integer", "null"]
+        description:
+          type: string
+        categoryId:
+          type: ["integer", "null"]
+        dueDate:
+          type: string
+          format: date
+        amount:
+          type: number
 
     MarkPaidInput:
       type: object

@@ -21,6 +21,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -47,12 +54,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Tag } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 
 const categorySchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
-  color: z.string().optional(),
+  type: z.enum(["receita", "despesa"]),
 });
 
 type CategoryForm = z.infer<typeof categorySchema>;
@@ -82,7 +90,7 @@ function CategoryDialog({
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>Categorias organizam suas despesas.</DialogDescription>
+          <DialogDescription>Categorias organizam receitas e despesas.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -101,22 +109,21 @@ function CategoryDialog({
             />
             <FormField
               control={form.control}
-              name="color"
+              name="type"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cor</FormLabel>
-                  <div className="flex gap-2">
+                  <FormLabel>Vincular a</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
-                      <Input type="color" className="w-16 p-1 h-10" {...field} />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Escolha o vínculo" />
+                      </SelectTrigger>
                     </FormControl>
-                    <Input
-                      type="text"
-                      value={field.value}
-                      onChange={field.onChange}
-                      className="flex-1 uppercase font-mono"
-                      placeholder="#000000"
-                    />
-                  </div>
+                    <SelectContent>
+                      <SelectItem value="despesa">Despesas</SelectItem>
+                      <SelectItem value="receita">Receitas</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -143,7 +150,7 @@ export default function Categorias() {
   const createCategory = useCreateCategory();
   const deleteCategory = useDeleteCategory();
 
-  const createDefaults: CategoryForm = { name: "", color: "#3b82f6" };
+  const createDefaults: CategoryForm = { name: "", type: "despesa" };
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: getListCategoriesQueryKey() });
@@ -181,7 +188,7 @@ export default function Categorias() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Categorias</h1>
-          <p className="text-muted-foreground">Gerencie as categorias de despesas do sistema</p>
+          <p className="text-muted-foreground">Gerencie categorias de receitas e despesas do sistema</p>
         </div>
         <Button onClick={() => setIsCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" /> Nova Categoria
@@ -202,8 +209,8 @@ export default function Categorias() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-16"></TableHead>
                 <TableHead>Nome</TableHead>
+                <TableHead>Vínculo</TableHead>
                 <TableHead className="w-[100px] text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -211,8 +218,8 @@ export default function Categorias() {
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell><Skeleton className="h-6 w-6 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                   </TableRow>
                 ))
@@ -225,15 +232,19 @@ export default function Categorias() {
               ) : (
                 categories?.map((category) => (
                   <TableRow key={category.id}>
-                    <TableCell>
-                      <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center border"
-                        style={{ backgroundColor: category.color || '#e5e7eb' }}
-                      >
-                        <Tag className="w-3 h-3 text-white mix-blend-difference" />
-                      </div>
-                    </TableCell>
                     <TableCell className="font-medium">{category.name}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className={
+                          category.type === "receita"
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50"
+                            : "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-50"
+                        }
+                      >
+                        {category.type === "receita" ? "Receitas" : "Despesas"}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right">
                       <AlertDialog>
                         <AlertDialogTrigger asChild>

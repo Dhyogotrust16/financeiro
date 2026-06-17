@@ -10,8 +10,15 @@ import type { BillingItem } from './billingItem';
 
 export interface BillingDetail {
   id: number;
-  clientId: number;
-  clientName: string;
+  /** @nullable */
+  clientId?: number | null;
+  /** @nullable */
+  clientName?: string | null;
+  description: string;
+  /** @nullable */
+  categoryId?: number | null;
+  /** @nullable */
+  categoryName?: string | null;
   month: number;
   year: number;
   dueDate: string;

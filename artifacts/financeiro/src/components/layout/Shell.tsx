@@ -25,29 +25,85 @@ import { useTheme } from "../ThemeProvider";
 import { Button } from "../ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet";
 
+type NavTone =
+  | "sky"
+  | "violet"
+  | "emerald"
+  | "rose"
+  | "amber"
+  | "cyan"
+  | "orange"
+  | "fuchsia"
+  | "lime"
+  | "blue"
+  | "teal"
+  | "indigo";
+
 interface NavItem {
   title: string;
   href: string;
   icon: React.ElementType;
+  tone: NavTone;
 }
 
+const NAV_ICON_TONES: Record<NavTone, string> = {
+  sky: "bg-sky-500/15 text-sky-600 ring-sky-500/20 dark:text-sky-400",
+  violet: "bg-violet-500/15 text-violet-600 ring-violet-500/20 dark:text-violet-400",
+  emerald: "bg-emerald-500/15 text-emerald-600 ring-emerald-500/20 dark:text-emerald-400",
+  rose: "bg-rose-500/15 text-rose-600 ring-rose-500/20 dark:text-rose-400",
+  amber: "bg-amber-500/15 text-amber-700 ring-amber-500/20 dark:text-amber-400",
+  cyan: "bg-cyan-500/15 text-cyan-600 ring-cyan-500/20 dark:text-cyan-400",
+  orange: "bg-orange-500/15 text-orange-600 ring-orange-500/20 dark:text-orange-400",
+  fuchsia: "bg-fuchsia-500/15 text-fuchsia-600 ring-fuchsia-500/20 dark:text-fuchsia-400",
+  lime: "bg-lime-500/15 text-lime-700 ring-lime-500/20 dark:text-lime-400",
+  blue: "bg-blue-500/15 text-blue-600 ring-blue-500/20 dark:text-blue-400",
+  teal: "bg-teal-500/15 text-teal-600 ring-teal-500/20 dark:text-teal-400",
+  indigo: "bg-indigo-500/15 text-indigo-600 ring-indigo-500/20 dark:text-indigo-400",
+};
+
 const navItems: NavItem[] = [
-  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Clientes", href: "/clientes", icon: Users },
-  { title: "Receitas", href: "/receitas", icon: ArrowDownToLine },
-  { title: "Despesas", href: "/despesas", icon: ArrowUpToLine },
-  { title: "Cobranças", href: "/cobrancas", icon: Receipt },
-  { title: "Contas a Receber", href: "/contas-receber", icon: Wallet },
-  { title: "Contas a Pagar", href: "/contas-pagar", icon: ArrowRightLeft },
-  { title: "Relatórios", href: "/relatorios", icon: FileText },
-  { title: "Categorias", href: "/categorias", icon: Tags },
+  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard, tone: "sky" },
+  { title: "Clientes", href: "/clientes", icon: Users, tone: "violet" },
+  { title: "Receitas", href: "/receitas", icon: ArrowDownToLine, tone: "emerald" },
+  { title: "Despesas", href: "/despesas", icon: ArrowUpToLine, tone: "rose" },
+  { title: "Cobranças", href: "/cobrancas", icon: Receipt, tone: "amber" },
+  { title: "Contas a Receber", href: "/contas-receber", icon: Wallet, tone: "cyan" },
+  { title: "Contas a Pagar", href: "/contas-pagar", icon: ArrowRightLeft, tone: "orange" },
+  { title: "Relatórios", href: "/relatorios", icon: FileText, tone: "fuchsia" },
+  { title: "Categorias", href: "/categorias", icon: Tags, tone: "lime" },
 ];
 
-const whatsappSubItems = [
-  { title: "Conexão", href: "/whatsapp", icon: Wifi },
-  { title: "Chat", href: "/whatsapp/chat", icon: MessageSquare },
-  { title: "Métricas", href: "/whatsapp/dashboard", icon: BarChart2 },
+const whatsappSubItems: NavItem[] = [
+  { title: "Conexão", href: "/whatsapp", icon: Wifi, tone: "blue" },
+  { title: "Chat", href: "/whatsapp/chat", icon: MessageSquare, tone: "teal" },
+  { title: "Métricas", href: "/whatsapp/dashboard", icon: BarChart2, tone: "indigo" },
 ];
+
+function NavIcon({
+  icon: Icon,
+  tone,
+  active,
+  compact = false,
+}: {
+  icon: React.ElementType;
+  tone: NavTone;
+  active?: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center justify-center rounded-md ring-1 transition-colors ${
+        compact ? "h-7 w-7" : "h-8 w-8"
+      } ${
+        active
+          ? "bg-white/15 text-white ring-white/10 shadow-sm"
+          : NAV_ICON_TONES[tone]
+      }`}
+    >
+      <Icon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+    </span>
+  );
+}
 
 function NavLinks({ onClick }: { onClick?: () => void }) {
   const [location] = useLocation();
@@ -68,7 +124,7 @@ function NavLinks({ onClick }: { onClick?: () => void }) {
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
-              <item.icon className="h-5 w-5" />
+              <NavIcon icon={item.icon} tone={item.tone} active={isActive} />
               {item.title}
             </span>
           </Link>
@@ -78,20 +134,20 @@ function NavLinks({ onClick }: { onClick?: () => void }) {
       {/* WhatsApp with submenu */}
       <div>
         <button
-          onClick={() => setWppOpen(v => !v)}
+          onClick={() => setWppOpen((v) => !v)}
           className={`w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
             isWhatsAppActive
               ? "bg-primary/10 text-primary"
               : "text-muted-foreground hover:bg-muted hover:text-foreground"
           }`}
         >
-          <MessageCircle className="h-5 w-5" />
+          <NavIcon icon={MessageCircle} tone="emerald" active={isWhatsAppActive} />
           <span className="flex-1 text-left">WhatsApp</span>
           <ChevronDown className={`h-4 w-4 transition-transform ${wppOpen ? "rotate-180" : ""}`} />
         </button>
         {wppOpen && (
           <div className="mt-1 ml-4 space-y-1 border-l border-border pl-3">
-            {whatsappSubItems.map(item => {
+            {whatsappSubItems.map((item) => {
               const isActive = location === item.href;
               return (
                 <Link key={item.href} href={item.href}>
@@ -103,7 +159,7 @@ function NavLinks({ onClick }: { onClick?: () => void }) {
                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >
-                    <item.icon className="h-4 w-4" />
+                    <NavIcon icon={item.icon} tone={item.tone} active={isActive} compact />
                     {item.title}
                   </span>
                 </Link>

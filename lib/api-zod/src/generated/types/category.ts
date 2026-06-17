@@ -5,10 +5,10 @@
  * Financial management system API
  * OpenAPI spec version: 0.1.0
  */
+import type { CategoryType } from './categoryType';
 
 export interface Category {
   id: number;
   name: string;
-  /** @nullable */
-  color?: string | null;
+  type: CategoryType;
 }

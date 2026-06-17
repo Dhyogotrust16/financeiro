@@ -29,12 +29,22 @@ router.get("/", requireAuth, async (req, res) => {
 router.post("/", requireAuth, async (req, res) => {
   const userId = (req as any).userId;
   const { description, amount, dueDate, categoryId } = req.body;
+  const [category] = categoryId === undefined || categoryId === null || categoryId === ""
+    ? []
+    : await db.select().from(categoriesTable).where(and(
+        eq(categoriesTable.id, Number(categoryId)),
+        eq(categoriesTable.userId, userId),
+        eq(categoriesTable.type, "despesa")
+      ));
+  if (categoryId !== undefined && categoryId !== null && categoryId !== "" && !category) {
+    return res.status(400).json({ error: "Categoria incompatível com conta a pagar" });
+  }
   const [row] = await db.insert(payablesTable).values({
     userId,
     description,
     amount: String(amount),
     dueDate,
-    categoryId: categoryId ?? null,
+    categoryId: category?.id ?? null,
     status: "pendente",
   }).returning();
   return res.status(201).json(formatPayable(row, null));
@@ -44,11 +54,21 @@ router.patch("/:id", requireAuth, async (req, res) => {
   const userId = (req as any).userId;
   const id = Number(req.params.id);
   const { description, amount, dueDate, categoryId } = req.body;
+  const [category] = categoryId === undefined || categoryId === null || categoryId === ""
+    ? []
+    : await db.select().from(categoriesTable).where(and(
+        eq(categoriesTable.id, Number(categoryId)),
+        eq(categoriesTable.userId, userId),
+        eq(categoriesTable.type, "despesa")
+      ));
+  if (categoryId !== undefined && categoryId !== null && categoryId !== "" && !category) {
+    return res.status(400).json({ error: "Categoria incompatível com conta a pagar" });
+  }
   const updates: any = {};
   if (description !== undefined) updates.description = description;
   if (amount !== undefined) updates.amount = String(amount);
   if (dueDate !== undefined) updates.dueDate = dueDate;
-  if (categoryId !== undefined) updates.categoryId = categoryId;
+  if (categoryId !== undefined) updates.categoryId = category?.id ?? null;
   const [row] = await db.update(payablesTable)
     .set(updates)
     .where(and(eq(payablesTable.id, id), eq(payablesTable.userId, userId), eq(payablesTable.status, "pendente")))

@@ -17,7 +17,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { User, Phone, Mail, MapPin, FileText, Calendar, Building, DollarSign } from "lucide-react";
+import { User, Phone, Mail, MapPin, FileText, Calendar, Building } from "lucide-react";
 
 export default function ClienteDetail() {
   const [, params] = useRoute("/clientes/:id");
@@ -87,16 +87,6 @@ export default function ClienteDetail() {
                 <p className="text-sm text-muted-foreground">{client.address || 'Não informado'}</p>
               </div>
             </div>
-            <div className="pt-4 border-t mt-4">
-              <div className="flex items-start gap-3">
-                <DollarSign className="h-5 w-5 text-primary mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Honorário Mensal</p>
-                  <p className="text-lg font-bold text-primary">{formatCurrency(client.monthlyFee)}</p>
-                  <p className="text-xs text-muted-foreground">Vencimento: Dia {client.dueDay}</p>
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
 
@@ -119,7 +109,7 @@ export default function ClienteDetail() {
                     <h3 className="font-semibold mb-2">Fechamento de {currentMonth}/{currentYear}</h3>
                     <div className="bg-muted/30 rounded-lg p-4 mb-4">
                       <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Honorário Mensal</span>
+                        <span className="text-muted-foreground">Valor Base</span>
                         <span className="font-medium">{formatCurrency(monthlyClose?.monthlyFee)}</span>
                       </div>
                       <div className="flex justify-between py-2 border-b">

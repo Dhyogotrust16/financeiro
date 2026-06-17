@@ -1,6 +1,6 @@
 import { Router } from "express";
 import PDFDocument from "pdfkit";
-import { db, billingsTable, billingItemsTable, clientsTable } from "@workspace/db";
+import { db, billingsTable, billingItemsTable, clientsTable, categoriesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
@@ -31,8 +31,10 @@ router.get("/:id/pdf", requireAuth, async (req, res) => {
     clientDocument: clientsTable.document,
     clientEmail: clientsTable.email,
     clientPhone: clientsTable.phone,
+    categoryName: categoriesTable.name,
   }).from(billingsTable)
     .leftJoin(clientsTable, eq(billingsTable.clientId, clientsTable.id))
+    .leftJoin(categoriesTable, eq(billingsTable.categoryId, categoriesTable.id))
     .where(and(eq(billingsTable.id, id), eq(billingsTable.userId, userId)));
 
   if (!rows[0]) {
@@ -42,13 +44,14 @@ router.get("/:id/pdf", requireAuth, async (req, res) => {
   const items = await db.select().from(billingItemsTable)
     .where(eq(billingItemsTable.billingId, id));
 
-  const { billing, clientName, clientDocument, clientEmail, clientPhone } = rows[0];
+  const { billing, clientName, clientDocument, clientEmail, clientPhone, categoryName } = rows[0];
   const now = new Date().toISOString().split("T")[0];
   let status = billing.status;
   if (status === "pendente" && billing.dueDate < now) status = "atrasado";
 
   const monthLabel = `${MONTH_NAMES[billing.month - 1]}/${billing.year}`;
-  const fileName = `cobranca-${clientName?.replace(/\s+/g, "-").toLowerCase()}-${billing.month}-${billing.year}.pdf`;
+  const fileLabel = (clientName ?? billing.description ?? "cobranca").replace(/\s+/g, "-").toLowerCase();
+  const fileName = `cobranca-${fileLabel}-${billing.month}-${billing.year}.pdf`;
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
@@ -98,13 +101,18 @@ router.get("/:id/pdf", requireAuth, async (req, res) => {
 
   // ── Client section ──────────────────────────────────────────────────────
   const clientY = cardY + cardH + 25;
-  doc.fontSize(9).fillColor(MUTED).font("Helvetica").text("CLIENTE", MARGIN, clientY);
+  doc.fontSize(9).fillColor(MUTED).font("Helvetica").text(clientName ? "CLIENTE" : "DESCRIÇÃO", MARGIN, clientY);
   doc.moveTo(MARGIN, clientY + 12).lineTo(MARGIN + CONTENT_WIDTH, clientY + 12).stroke(BORDER);
 
   doc.fontSize(13).fillColor(PRIMARY).font("Helvetica-Bold")
-    .text(clientName ?? "—", MARGIN, clientY + 20);
+    .text(clientName ?? billing.description ?? "—", MARGIN, clientY + 20);
 
   let clientInfoY = clientY + 38;
+  if (clientName && billing.description) {
+    doc.fontSize(9).fillColor(MUTED).font("Helvetica")
+      .text(`Descrição: ${billing.description}`, MARGIN, clientInfoY);
+    clientInfoY += 14;
+  }
   if (clientDocument) {
     doc.fontSize(9).fillColor(MUTED).font("Helvetica")
       .text(`CPF/CNPJ: ${clientDocument}`, MARGIN, clientInfoY);
@@ -118,6 +126,11 @@ router.get("/:id/pdf", requireAuth, async (req, res) => {
   if (clientPhone) {
     doc.fontSize(9).fillColor(MUTED).font("Helvetica")
       .text(`Telefone: ${clientPhone}`, MARGIN, clientInfoY);
+    clientInfoY += 14;
+  }
+  if (categoryName) {
+    doc.fontSize(9).fillColor(MUTED).font("Helvetica")
+      .text(`Categoria: ${categoryName}`, MARGIN, clientInfoY);
     clientInfoY += 14;
   }
 
@@ -148,7 +161,7 @@ router.get("/:id/pdf", requireAuth, async (req, res) => {
     if (i % 2 === 1) {
       doc.rect(MARGIN, rowY - 3, CONTENT_WIDTH, ROW_H).fill("#fafafa");
     }
-    const typeLabel = item.itemType === "honorario" ? "Honorário" : "Despesa";
+    const typeLabel = item.itemType === "honorario" ? "Honorário" : item.itemType === "despesa" ? "Despesa" : "Lançamento";
     doc.fontSize(9).fillColor(PRIMARY).font("Helvetica")
       .text(item.description, COL_DESC + 6, rowY, { width: COL_DESC_W - 6 });
     doc.fontSize(9).fillColor(MUTED).font("Helvetica")

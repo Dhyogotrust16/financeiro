@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { 
   useListClients, 
   useCreateClient, 
@@ -12,10 +12,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { format } from "date-fns";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Plus, Trash2, Search, Pencil, Eye, UserPlus } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -58,10 +60,28 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Search, Pencil, Eye, UserPlus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatCurrency } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
+
+function buildPickerDate(dueDay: number) {
+  const safeDay = Math.max(1, Math.min(dueDay, 31));
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+  const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+  if (safeDay <= daysInCurrentMonth) {
+    return new Date(currentYear, currentMonth, safeDay);
+  }
+
+  return new Date(currentYear, 0, safeDay);
+}
+
+function parsePickerDate(dateString: string) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
 
 const clientSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -70,11 +90,20 @@ const clientSchema = z.object({
   email: z.string().email("E-mail inválido").optional().or(z.literal('')),
   address: z.string().optional(),
   monthlyFee: z.coerce.number().min(0, "Valor não pode ser negativo"),
-  dueDay: z.coerce.number().min(1).max(31, "Dia de vencimento deve ser entre 1 e 31"),
+  dueDate: z.date({ required_error: "Selecione a data de vencimento" }),
   status: z.enum(["ativo", "inativo"]),
 });
 
 type ClientForm = z.infer<typeof clientSchema>;
+
+function toClientInput(values: ClientForm): ClientInput {
+  const { dueDate, ...rest } = values;
+  return {
+    ...rest,
+    dueDate: format(dueDate, "yyyy-MM-dd"),
+    dueDay: dueDate.getDate(),
+  };
+}
 
 function ClientDialog({
   open,
@@ -95,6 +124,10 @@ function ClientDialog({
     resolver: zodResolver(clientSchema),
     defaultValues,
   });
+
+  useEffect(() => {
+    form.reset(defaultValues);
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) form.reset(defaultValues); onOpenChange(o); }}>
@@ -154,31 +187,6 @@ function ClientDialog({
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="monthlyFee"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Honorário Mensal (R$)</FormLabel>
-                    <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="dueDay"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Dia de Vencimento</FormLabel>
-                    <FormControl><Input type="number" min="1" max="31" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
             <FormField
               control={form.control}
               name="status"
@@ -236,7 +244,7 @@ export default function Clientes() {
     email: "",
     address: "",
     monthlyFee: 0,
-    dueDay: 5,
+    dueDate: buildPickerDate(5),
     status: "ativo",
   };
 
@@ -246,13 +254,16 @@ export default function Clientes() {
 
   function handleCreate(values: ClientForm) {
     createClient.mutate(
-      { data: values as ClientInput },
+      { data: toClientInput(values) },
       {
         onSuccess: () => {
           invalidate();
           queryClient.invalidateQueries({ queryKey: getListBillingsQueryKey() });
           setIsCreateOpen(false);
-          toast({ title: "Cliente criado", description: "O cliente foi adicionado com sucesso." });
+          toast({
+            title: "Cliente criado",
+            description: "O cliente foi cadastrado com sucesso.",
+          });
         },
         onError: () => toast({ title: "Erro", description: "Não foi possível criar o cliente.", variant: "destructive" }),
       }
@@ -261,10 +272,11 @@ export default function Clientes() {
 
   function handleEdit(id: number, values: ClientForm) {
     updateClient.mutate(
-      { id, data: values },
+      { id, data: toClientInput(values) },
       {
         onSuccess: () => {
           invalidate();
+          queryClient.invalidateQueries({ queryKey: getListBillingsQueryKey() });
           setEditingId(null);
           toast({ title: "Cliente atualizado" });
         },
@@ -291,7 +303,7 @@ export default function Clientes() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
-          <p className="text-muted-foreground">Gerencie os clientes e seus honorários mensais</p>
+          <p className="text-muted-foreground">Gerencie os clientes cadastrados</p>
         </div>
         <Button onClick={() => setIsCreateOpen(true)}>
           <UserPlus className="mr-2 h-4 w-4" /> Novo Cliente
@@ -325,7 +337,6 @@ export default function Clientes() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Documento</TableHead>
-                <TableHead className="text-right">Honorário</TableHead>
                 <TableHead>Vencimento</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-[140px] text-right">Ações</TableHead>
@@ -337,7 +348,6 @@ export default function Clientes() {
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-12" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
@@ -345,7 +355,7 @@ export default function Clientes() {
                 ))
               ) : filteredClients?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     Nenhum cliente encontrado
                   </TableCell>
                 </TableRow>
@@ -358,7 +368,7 @@ export default function Clientes() {
                     email: client.email ?? "",
                     address: client.address ?? "",
                     monthlyFee: client.monthlyFee,
-                    dueDay: client.dueDay,
+                    dueDate: client.dueDate ? parsePickerDate(client.dueDate) : buildPickerDate(client.dueDay),
                     status: client.status as "ativo" | "inativo",
                   };
                   return (
@@ -369,8 +379,7 @@ export default function Clientes() {
                         </Link>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{client.document || '-'}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(client.monthlyFee)}</TableCell>
-                      <TableCell>Dia {client.dueDay}</TableCell>
+                      <TableCell>{client.dueDate ? formatDate(client.dueDate) : `Dia ${client.dueDay}`}</TableCell>
                       <TableCell>
                         <Badge
                           variant={client.status === 'ativo' ? "default" : "secondary"}

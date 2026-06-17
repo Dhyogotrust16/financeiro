@@ -19,6 +19,7 @@ export interface Client {
   /** @nullable */
   address?: string | null;
   monthlyFee: number;
+  dueDate: string;
   dueDay: number;
   status: ClientStatus;
   /** @nullable */

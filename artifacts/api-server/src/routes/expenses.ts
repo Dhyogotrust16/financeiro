@@ -30,16 +30,26 @@ router.get("/", requireAuth, async (req, res) => {
 router.post("/", requireAuth, async (req, res) => {
   const userId = (req as any).userId;
   const { date, description, amount, categoryId, clientId, passToClient } = req.body;
+  const [category] = categoryId === undefined || categoryId === null || categoryId === ""
+    ? []
+    : await db.select().from(categoriesTable).where(and(
+        eq(categoriesTable.id, Number(categoryId)),
+        eq(categoriesTable.userId, userId),
+        eq(categoriesTable.type, "despesa")
+      ));
+  if (categoryId !== undefined && categoryId !== null && categoryId !== "" && !category) {
+    return res.status(400).json({ error: "Categoria incompatível com despesa" });
+  }
   const [row] = await db.insert(expensesTable).values({
     userId,
     date,
     description,
     amount: String(amount),
-    categoryId: categoryId ?? null,
+    categoryId: category?.id ?? null,
     clientId: clientId ?? null,
     passToClient: passToClient ?? false,
   }).returning();
-  res.status(201).json(formatExpense(row, null, null));
+  return res.status(201).json(formatExpense(row, null, null));
 });
 
 router.get("/:id", requireAuth, async (req, res) => {
@@ -61,11 +71,21 @@ router.patch("/:id", requireAuth, async (req, res) => {
   const userId = (req as any).userId;
   const id = Number(req.params.id);
   const { date, description, amount, categoryId, clientId, passToClient } = req.body;
+  const [category] = categoryId === undefined || categoryId === null || categoryId === ""
+    ? []
+    : await db.select().from(categoriesTable).where(and(
+        eq(categoriesTable.id, Number(categoryId)),
+        eq(categoriesTable.userId, userId),
+        eq(categoriesTable.type, "despesa")
+      ));
+  if (categoryId !== undefined && categoryId !== null && categoryId !== "" && !category) {
+    return res.status(400).json({ error: "Categoria incompatível com despesa" });
+  }
   const updates: any = {};
   if (date !== undefined) updates.date = date;
   if (description !== undefined) updates.description = description;
   if (amount !== undefined) updates.amount = String(amount);
-  if (categoryId !== undefined) updates.categoryId = categoryId;
+  if (categoryId !== undefined) updates.categoryId = category?.id ?? null;
   if (clientId !== undefined) updates.clientId = clientId;
   if (passToClient !== undefined) updates.passToClient = passToClient;
   const [row] = await db.update(expensesTable).set(updates).where(and(eq(expensesTable.id, id), eq(expensesTable.userId, userId))).returning();

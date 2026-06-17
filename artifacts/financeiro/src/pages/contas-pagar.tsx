@@ -95,6 +95,7 @@ function PayableDialog({
   title: string;
 }) {
   const { data: categories } = useListCategories();
+  const expenseCategories = categories?.filter((category) => category.type === "despesa") ?? [];
   const form = useForm<PayableForm>({
     resolver: zodResolver(payableSchema),
     defaultValues,
@@ -159,7 +160,7 @@ function PayableDialog({
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="none">Sem categoria</SelectItem>
-                      {categories?.map((c) => (
+                      {expenseCategories.map((c) => (
                         <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                       ))}
                     </SelectContent>

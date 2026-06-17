@@ -4,8 +4,9 @@ Sistema de gestão financeira para contadores e escritórios de contabilidade �
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — API server (port 8080, proxied at `/api`)
-- `pnpm --filter @workspace/financeiro run dev` — Frontend React+Vite (port 25404, proxied at `/`)
+- `pnpm --filter @workspace/api-server run dev` — sistema completo em uma porta só
+- `pnpm start` — atalho equivalente no root do workspace
+- `pnpm --filter @workspace/api-server run backfill:current-month-billings` — cria Contas a Receber faltantes para clientes ativos com honorário
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run typecheck:libs` — rebuild lib declarations (run after schema changes)
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec

@@ -6,7 +6,7 @@ export const categoriesTable = pgTable("categories", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull(),
   name: text("name").notNull(),
-  color: text("color"),
+  type: text("type").notNull().default("despesa"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

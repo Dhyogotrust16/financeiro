@@ -311,6 +311,12 @@ export default function Receitas() {
   }
 
   function handleDelete(id: number) {
+    const revenue = Array.isArray(revenues) ? revenues.find((r) => r.id === id) : undefined;
+    if (revenue?.status === "recebido") {
+      toast({ title: "Erro", description: "Não é possível excluir receitas já recebidas.", variant: "destructive" });
+      return;
+    }
+
     deleteRevenue.mutate(
       { id },
       {
@@ -425,9 +431,9 @@ export default function Receitas() {
                               className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
                               title="Marcar como recebido"
                               onClick={() => handleMarkReceived(revenue.id)}
-                            >
-                              <CheckCircle2 className="h-4 w-4" />
-                            </Button>
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                              </Button>
                           )}
                           <Button
                             variant="ghost"
@@ -444,6 +450,7 @@ export default function Receitas() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                title="Excluir"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -452,17 +459,21 @@ export default function Receitas() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Excluir receita?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  "{revenue.description}" será excluída permanentemente.
+                                  {revenue.status === "recebido"
+                                    ? "Esta receita já foi recebida e não pode ser excluída."
+                                    : `"${revenue.description}" será excluída permanentemente.`}
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(revenue.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Excluir
-                                </AlertDialogAction>
+                                {revenue.status === "pendente" && (
+                                  <AlertDialogAction
+                                    onClick={() => handleDelete(revenue.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Excluir
+                                  </AlertDialogAction>
+                                )}
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>

@@ -5,8 +5,9 @@
  * Financial management system API
  * OpenAPI spec version: 0.1.0
  */
+import type { CategoryInputType } from './categoryInputType';
 
 export interface CategoryInput {
   name: string;
-  color?: string;
+  type: CategoryInputType;
 }

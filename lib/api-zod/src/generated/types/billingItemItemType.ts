@@ -12,4 +12,5 @@ export type BillingItemItemType = typeof BillingItemItemType[keyof typeof Billin
 export const BillingItemItemType = {
   honorario: 'honorario',
   despesa: 'despesa',
+  manual: 'manual',
 } as const;

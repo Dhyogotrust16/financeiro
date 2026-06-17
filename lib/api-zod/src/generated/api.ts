@@ -78,6 +78,7 @@ export const ListClientsResponseItem = zod.object({
   "email": zod.string().nullish(),
   "address": zod.string().nullish(),
   "monthlyFee": zod.number(),
+  "dueDate": zod.string(),
   "dueDay": zod.number(),
   "status": zod.enum(['ativo', 'inativo']),
   "notes": zod.string().nullish(),
@@ -98,6 +99,7 @@ export const CreateClientBody = zod.object({
   "email": zod.string().optional(),
   "address": zod.string().optional(),
   "monthlyFee": zod.number(),
+  "dueDate": zod.string(),
   "dueDay": zod.number(),
   "status": zod.enum(['ativo', 'inativo']).default(createClientBodyStatusDefault),
   "notes": zod.string().optional()
@@ -119,6 +121,7 @@ export const GetClientResponse = zod.object({
   "email": zod.string().nullish(),
   "address": zod.string().nullish(),
   "monthlyFee": zod.number(),
+  "dueDate": zod.string(),
   "dueDay": zod.number(),
   "status": zod.enum(['ativo', 'inativo']),
   "notes": zod.string().nullish(),
@@ -140,6 +143,7 @@ export const UpdateClientBody = zod.object({
   "email": zod.string().optional(),
   "address": zod.string().optional(),
   "monthlyFee": zod.number().optional(),
+  "dueDate": zod.string().optional(),
   "dueDay": zod.number().optional(),
   "status": zod.enum(['ativo', 'inativo']).optional(),
   "notes": zod.string().optional()
@@ -153,6 +157,7 @@ export const UpdateClientResponse = zod.object({
   "email": zod.string().nullish(),
   "address": zod.string().nullish(),
   "monthlyFee": zod.number(),
+  "dueDate": zod.string(),
   "dueDay": zod.number(),
   "status": zod.enum(['ativo', 'inativo']),
   "notes": zod.string().nullish(),
@@ -207,7 +212,7 @@ export const GetClientMonthlyCloseResponse = zod.object({
 export const ListCategoriesResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
-  "color": zod.string().nullish()
+  "type": zod.enum(['receita', 'despesa'])
 })
 export const ListCategoriesResponse = zod.array(ListCategoriesResponseItem)
 
@@ -217,7 +222,7 @@ export const ListCategoriesResponse = zod.array(ListCategoriesResponseItem)
  */
 export const CreateCategoryBody = zod.object({
   "name": zod.string(),
-  "color": zod.string().optional()
+  "type": zod.enum(['receita', 'despesa'])
 })
 
 
@@ -532,8 +537,11 @@ export const ListBillingsQueryParams = zod.object({
 
 export const ListBillingsResponseItem = zod.object({
   "id": zod.number(),
-  "clientId": zod.number(),
-  "clientName": zod.string(),
+  "clientId": zod.number().nullish(),
+  "clientName": zod.string().nullish(),
+  "description": zod.string(),
+  "categoryId": zod.number().nullish(),
+  "categoryName": zod.string().nullish(),
   "month": zod.number(),
   "year": zod.number(),
   "dueDate": zod.string(),
@@ -551,9 +559,11 @@ export const ListBillingsResponse = zod.array(ListBillingsResponseItem)
  * @summary Generate a monthly billing for a client
  */
 export const CreateBillingBody = zod.object({
-  "clientId": zod.number(),
-  "month": zod.number(),
-  "year": zod.number()
+  "clientId": zod.number().nullish(),
+  "description": zod.string().optional(),
+  "categoryId": zod.number().nullish(),
+  "dueDate": zod.coerce.date(),
+  "amount": zod.number()
 })
 
 
@@ -566,8 +576,11 @@ export const GetBillingParams = zod.object({
 
 export const GetBillingResponse = zod.object({
   "id": zod.number(),
-  "clientId": zod.number(),
-  "clientName": zod.string(),
+  "clientId": zod.number().nullish(),
+  "clientName": zod.string().nullish(),
+  "description": zod.string(),
+  "categoryId": zod.number().nullish(),
+  "categoryName": zod.string().nullish(),
   "month": zod.number(),
   "year": zod.number(),
   "dueDate": zod.string(),
@@ -582,7 +595,7 @@ export const GetBillingResponse = zod.object({
   "billingId": zod.number(),
   "description": zod.string(),
   "amount": zod.number(),
-  "itemType": zod.enum(['honorario', 'despesa']),
+  "itemType": zod.enum(['honorario', 'despesa', 'manual']),
   "expenseId": zod.number().nullish()
 }))
 })
@@ -609,8 +622,11 @@ export const MarkBillingPaidBody = zod.object({
 
 export const MarkBillingPaidResponse = zod.object({
   "id": zod.number(),
-  "clientId": zod.number(),
-  "clientName": zod.string(),
+  "clientId": zod.number().nullish(),
+  "clientName": zod.string().nullish(),
+  "description": zod.string(),
+  "categoryId": zod.number().nullish(),
+  "categoryName": zod.string().nullish(),
   "month": zod.number(),
   "year": zod.number(),
   "dueDate": zod.string(),

@@ -5,7 +5,9 @@ import { z } from "zod/v4";
 export const billingsTable = pgTable("billings", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull(),
-  clientId: integer("client_id").notNull(),
+  clientId: integer("client_id"),
+  description: text("description").notNull().default(""),
+  categoryId: integer("category_id"),
   month: integer("month").notNull(),
   year: integer("year").notNull(),
   dueDate: date("due_date", { mode: "string" }).notNull(),

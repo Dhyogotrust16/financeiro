@@ -93,6 +93,7 @@ function ExpenseDialog({
 }) {
   const { data: clients } = useListClients();
   const { data: categories } = useListCategories();
+  const expenseCategories = categories?.filter((category) => category.type === "despesa") ?? [];
 
   const form = useForm<ExpenseForm>({
     resolver: zodResolver(expenseSchema),
@@ -162,7 +163,7 @@ function ExpenseDialog({
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="none">Sem categoria</SelectItem>
-                      {categories?.map((c) => (
+                      {expenseCategories.map((c) => (
                         <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                       ))}
                     </SelectContent>

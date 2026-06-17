@@ -4,9 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development pnpm run build && node --env-file=.env --enable-source-maps ./dist/index.mjs",
+    "dev": "pnpm run build:fe && pnpm run build && node --env-file=.env --enable-source-maps ./dist/index.mjs",
+    "build:fe": "pnpm --filter @workspace/financeiro run build",
     "build": "node ./build.mjs",
     "start": "node --env-file=.env --enable-source-maps ./dist/index.mjs",
+    "backfill:current-month-billings": "node --env-file=.env ./scripts/backfill-current-month-billings.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

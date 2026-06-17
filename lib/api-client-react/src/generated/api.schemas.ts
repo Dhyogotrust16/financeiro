@@ -57,6 +57,7 @@ export interface Client {
   /** @nullable */
   address?: string | null;
   monthlyFee: number;
+  dueDate: string;
   dueDay: number;
   status: ClientStatus;
   /** @nullable */
@@ -79,6 +80,7 @@ export interface ClientInput {
   email?: string;
   address?: string;
   monthlyFee: number;
+  dueDate: string;
   dueDay: number;
   status?: ClientInputStatus;
   notes?: string;
@@ -99,6 +101,7 @@ export interface ClientUpdate {
   email?: string;
   address?: string;
   monthlyFee?: number;
+  dueDate?: string;
   dueDay?: number;
   status?: ClientUpdateStatus;
   notes?: string;
@@ -134,16 +137,31 @@ export interface MonthlyClose {
   totalCharge: number;
 }
 
+export type CategoryType = typeof CategoryType[keyof typeof CategoryType];
+
+
+export const CategoryType = {
+  receita: 'receita',
+  despesa: 'despesa',
+} as const;
+
 export interface Category {
   id: number;
   name: string;
-  /** @nullable */
-  color?: string | null;
+  type: CategoryType;
 }
+
+export type CategoryInputType = typeof CategoryInputType[keyof typeof CategoryInputType];
+
+
+export const CategoryInputType = {
+  receita: 'receita',
+  despesa: 'despesa',
+} as const;
 
 export interface CategoryInput {
   name: string;
-  color?: string;
+  type: CategoryInputType;
 }
 
 export type RevenueStatus = typeof RevenueStatus[keyof typeof RevenueStatus];
@@ -232,8 +250,15 @@ export const BillingStatus = {
 
 export interface Billing {
   id: number;
-  clientId: number;
-  clientName: string;
+  /** @nullable */
+  clientId?: number | null;
+  /** @nullable */
+  clientName?: string | null;
+  description: string;
+  /** @nullable */
+  categoryId?: number | null;
+  /** @nullable */
+  categoryName?: string | null;
   month: number;
   year: number;
   dueDate: string;
@@ -261,6 +286,7 @@ export type BillingItemItemType = typeof BillingItemItemType[keyof typeof Billin
 export const BillingItemItemType = {
   honorario: 'honorario',
   despesa: 'despesa',
+  manual: 'manual',
 } as const;
 
 export interface BillingItem {
@@ -275,8 +301,15 @@ export interface BillingItem {
 
 export interface BillingDetail {
   id: number;
-  clientId: number;
-  clientName: string;
+  /** @nullable */
+  clientId?: number | null;
+  /** @nullable */
+  clientName?: string | null;
+  description: string;
+  /** @nullable */
+  categoryId?: number | null;
+  /** @nullable */
+  categoryName?: string | null;
   month: number;
   year: number;
   dueDate: string;
@@ -291,9 +324,13 @@ export interface BillingDetail {
 }
 
 export interface BillingInput {
-  clientId: number;
-  month: number;
-  year: number;
+  /** @nullable */
+  clientId?: number | null;
+  description?: string;
+  /** @nullable */
+  categoryId?: number | null;
+  dueDate: string;
+  amount: number;
 }
 
 export interface MarkPaidInput {

@@ -14,6 +14,7 @@ export interface ClientInput {
   email?: string;
   address?: string;
   monthlyFee: number;
+  dueDate: string;
   dueDay: number;
   status?: ClientInputStatus;
   notes?: string;

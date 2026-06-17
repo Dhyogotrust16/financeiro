@@ -14,6 +14,7 @@ export interface ClientUpdate {
   email?: string;
   address?: string;
   monthlyFee?: number;
+  dueDate?: string;
   dueDay?: number;
   status?: ClientUpdateStatus;
   notes?: string;

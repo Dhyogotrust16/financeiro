@@ -16,6 +16,8 @@ export * from './billingStatus';
 export * from './cashflowMonth';
 export * from './category';
 export * from './categoryInput';
+export * from './categoryInputType';
+export * from './categoryType';
 export * from './client';
 export * from './clientInput';
 export * from './clientInputStatus';
