@@ -1,0 +1,13 @@
+.git
+.vercel
+**/.vercel
+node_modules
+**/node_modules
+dist
+**/dist
+public
+artifacts/**/public
+.cache
+.local
+*.zip
+zipFile.zip
