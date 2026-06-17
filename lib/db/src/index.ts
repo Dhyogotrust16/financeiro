@@ -1,4 +1,5 @@
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import dns from "node:dns";
 import pg from "pg";
 import * as schema from "./schema";
 
@@ -9,15 +10,72 @@ type Database = NodePgDatabase<typeof schema>;
 let poolInstance: pg.Pool | null = null;
 let dbInstance: Database | null = null;
 
+function resolveDatabaseUrl(): string | null {
+  const rawUrl = process.env.SUPABASE_POOLER_URL ?? process.env.DATABASE_URL;
+  return rawUrl ?? null;
+}
+
+function createSupabaseLookup(hostname: string) {
+  return async (
+    lookupHost: string,
+    _options: dns.LookupOneOptions,
+    callback: (error: NodeJS.ErrnoException | null, address?: string, family?: number) => void,
+  ) => {
+    try {
+      if (hostname.endsWith(".supabase.co") && lookupHost === hostname) {
+        const records = await dns.promises.resolve6(lookupHost);
+        if (records[0]) {
+          callback(null, records[0], 6);
+          return;
+        }
+      }
+
+      const records = await dns.promises.resolve4(lookupHost);
+      if (records[0]) {
+        callback(null, records[0], 4);
+        return;
+      }
+
+      callback(new Error(`Unable to resolve ${lookupHost}`));
+    } catch (error) {
+      callback(error as NodeJS.ErrnoException);
+    }
+  };
+}
+
+function createPool(connectionString: string): pg.Pool {
+  const { hostname } = new URL(connectionString);
+  const isSupabaseHost =
+    hostname.endsWith(".supabase.co") || hostname.endsWith(".pooler.supabase.com");
+
+  return new Pool({
+    connectionString,
+    ...(hostname.endsWith(".supabase.co")
+      ? {
+          lookup: createSupabaseLookup(hostname),
+        }
+      : {}),
+    ...(isSupabaseHost
+      ? {
+          ssl: {
+            rejectUnauthorized: false,
+          },
+        }
+      : {}),
+  });
+}
+
 function createDb(): Database {
-  if (!process.env.DATABASE_URL) {
+  const connectionString = resolveDatabaseUrl();
+
+  if (!connectionString) {
     throw new Error(
       "DATABASE_URL must be set. Did you forget to provision a database?",
     );
   }
 
   if (!poolInstance) {
-    poolInstance = new Pool({ connectionString: process.env.DATABASE_URL });
+    poolInstance = createPool(connectionString);
   }
 
   if (!dbInstance) {
@@ -28,7 +86,7 @@ function createDb(): Database {
 }
 
 export function isDatabaseConfigured(): boolean {
-  return Boolean(process.env.DATABASE_URL);
+  return Boolean(resolveDatabaseUrl());
 }
 
 export function getDb(): Database {

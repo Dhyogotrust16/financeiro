@@ -4,7 +4,6 @@
   "framework": null,
   "build": {
     "env": {
-      "VITE_API_BASE_URL": "https://financeiro-mauve-six.vercel.app",
       "VITE_SUPABASE_URL": "https://vpzdndtrsrpnslwlsfxe.supabase.co",
       "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwemRuZHRyc3JwbnNsd2xzZnhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NDg2NDgsImV4cCI6MjA5NzAyNDY0OH0.1NkmU7O2h_kl5E7-GrGhTWzwjyCNS4uSAHptau_xgpQ"
     }
