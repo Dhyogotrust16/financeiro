@@ -2,6 +2,12 @@
   "buildCommand": "pnpm --filter @workspace/financeiro run build",
   "outputDirectory": "artifacts/financeiro/dist/public",
   "framework": null,
+  "build": {
+    "env": {
+      "VITE_SUPABASE_URL": "https://vpzdndtrsrpnslwlsfxe.supabase.co",
+      "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwemRuZHRyc3JwbnNsd2xzZnhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NDg2NDgsImV4cCI6MjA5NzAyNDY0OH0.1NkmU7O2h_kl5E7-GrGhTWzwjyCNS4uSAHptau_xgpQ"
+    }
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
