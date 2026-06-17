@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "cross-env PORT=5173 vite --config vite.config.ts --host 0.0.0.0",
     "build": "cross-env PORT=5173 vite build --config vite.config.ts",
+    "build:vercel": "pnpm run build && node ./scripts/copy-public.mjs",
     "serve": "cross-env PORT=5173 vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

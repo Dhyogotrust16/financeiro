@@ -3,6 +3,8 @@
 # compiled output
 dist
 public
+artifacts/financeiro/public/index.html
+artifacts/financeiro/public/assets/
 tmp
 out-tsc
 *.tsbuildinfo

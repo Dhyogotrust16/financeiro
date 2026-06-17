@@ -1,6 +1,5 @@
 {
-  "buildCommand": "pnpm run build",
-  "outputDirectory": "dist/public",
+  "buildCommand": "pnpm run build:vercel",
   "framework": null,
   "build": {
     "env": {
@@ -9,9 +8,6 @@
     }
   },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "env": {
-    "PORT": "5173"
-  }
+    { "source": "/(.*)", "destination": "/api" }
+  ]
 }
