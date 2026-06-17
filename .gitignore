@@ -61,3 +61,5 @@ artifacts/**/.env.*
 # Large files
 *.zip
 zipFile.zip
+
+.vercel
