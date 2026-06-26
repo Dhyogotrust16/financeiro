@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { useEvolutionConfig } from "@/hooks/use-whatsapp-config";
 import {
   Inbox, UserCheck, CheckCircle2, Clock, MessageCircleOff,
   Loader2, RefreshCw, Plus, Trash2, Zap, BarChart3,
@@ -11,13 +12,6 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
-
-const STORAGE_KEY = "evo_config";
-interface EvoConfig { apiUrl: string; apiKey: string; instanceName: string; }
-
-function getConfig(): EvoConfig | null {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null"); } catch { return null; }
-}
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
   open:      { label: "Abertas",         color: "text-blue-600",   bg: "bg-blue-50 dark:bg-blue-950/30",   icon: Inbox },
@@ -39,7 +33,7 @@ interface Metrics {
 interface QuickReply { id: number; shortcut: string; title: string; body: string; }
 
 export default function WhatsAppDashboard() {
-  const cfg = getConfig();
+  const { config, isReady } = useEvolutionConfig();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
@@ -47,10 +41,10 @@ export default function WhatsAppDashboard() {
   const [savingQR, setSavingQR] = useState(false);
 
   async function loadMetrics() {
-    if (!cfg) return;
+    if (!config) return;
     setLoading(true);
     try {
-      const r = await fetch(`/api/whatsapp/metrics/${cfg.instanceName}`);
+      const r = await fetch(`/api/whatsapp/metrics/${config.instanceName}`);
       const d = await r.json();
       setMetrics(d);
     } catch { /* ignore */ }
@@ -58,20 +52,20 @@ export default function WhatsAppDashboard() {
   }
 
   async function loadQR() {
-    if (!cfg) return;
+    if (!config) return;
     try {
-      const r = await fetch(`/api/whatsapp/quick-replies/${cfg.instanceName}`);
+      const r = await fetch(`/api/whatsapp/quick-replies/${config.instanceName}`);
       setQuickReplies(await r.json());
     } catch { /* ignore */ }
   }
 
-  useEffect(() => { loadMetrics(); loadQR(); }, [cfg?.instanceName]);
+  useEffect(() => { loadMetrics(); loadQR(); }, [config?.instanceName, isReady]);
 
   async function handleSaveQR() {
-    if (!cfg || !newQR.shortcut || !newQR.title || !newQR.body) return;
+    if (!config || !newQR.shortcut || !newQR.title || !newQR.body) return;
     setSavingQR(true);
     try {
-      const r = await fetch(`/api/whatsapp/quick-replies/${cfg.instanceName}`, {
+      const r = await fetch(`/api/whatsapp/quick-replies/${config.instanceName}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...newQR, shortcut: newQR.shortcut.startsWith("/") ? newQR.shortcut : `/${newQR.shortcut}` }),
       });
@@ -83,12 +77,21 @@ export default function WhatsAppDashboard() {
   }
 
   async function handleDeleteQR(id: number) {
-    if (!cfg) return;
-    await fetch(`/api/whatsapp/quick-replies/${cfg.instanceName}/${id}`, { method: "DELETE" });
+    if (!config) return;
+    await fetch(`/api/whatsapp/quick-replies/${config.instanceName}/${id}`, { method: "DELETE" });
     setQuickReplies(prev => prev.filter(q => q.id !== id));
   }
 
-  if (!cfg) {
+  if (!isReady && !config) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh] gap-3 text-muted-foreground">
+        <Loader2 className="h-10 w-10 animate-spin" />
+        <p>Carregando configuração do WhatsApp...</p>
+      </div>
+    );
+  }
+
+  if (!config) {
     return (
       <div className="flex flex-col items-center justify-center h-[50vh] gap-3 text-muted-foreground">
         <MessageCircleOff className="h-10 w-10" />
@@ -105,7 +108,7 @@ export default function WhatsAppDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Métricas de Atendimento</h1>
-          <p className="text-muted-foreground">Instância: {cfg.instanceName}</p>
+          <p className="text-muted-foreground">Instância: {config.instanceName}</p>
         </div>
         <Button variant="outline" size="sm" onClick={loadMetrics} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}

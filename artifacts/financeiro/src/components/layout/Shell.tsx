@@ -19,11 +19,15 @@ import {
   Wifi,
   MessageSquare,
   BarChart2,
+  Settings,
+  Handshake,
+  Landmark,
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "../ThemeProvider";
 import { Button } from "../ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet";
+import { useSystemBranding } from "@/lib/system-branding";
 
 type NavTone =
   | "sky"
@@ -37,7 +41,10 @@ type NavTone =
   | "lime"
   | "blue"
   | "teal"
-  | "indigo";
+  | "indigo"
+  | "slate"
+  | "purple"
+  | "green";
 
 interface NavItem {
   title: string;
@@ -59,6 +66,9 @@ const NAV_ICON_TONES: Record<NavTone, string> = {
   blue: "bg-blue-500/15 text-blue-600 ring-blue-500/20 dark:text-blue-400",
   teal: "bg-teal-500/15 text-teal-600 ring-teal-500/20 dark:text-teal-400",
   indigo: "bg-indigo-500/15 text-indigo-600 ring-indigo-500/20 dark:text-indigo-400",
+  slate: "bg-slate-500/15 text-slate-600 ring-slate-500/20 dark:text-slate-300",
+  purple: "bg-purple-500/15 text-purple-600 ring-purple-500/20 dark:text-purple-300",
+  green: "bg-green-500/15 text-green-700 ring-green-500/20 dark:text-green-400",
 };
 
 const navItems: NavItem[] = [
@@ -66,11 +76,14 @@ const navItems: NavItem[] = [
   { title: "Clientes", href: "/clientes", icon: Users, tone: "violet" },
   { title: "Receitas", href: "/receitas", icon: ArrowDownToLine, tone: "emerald" },
   { title: "Despesas", href: "/despesas", icon: ArrowUpToLine, tone: "rose" },
+  { title: "Honorários", href: "/honorarios", icon: Landmark, tone: "green" },
   { title: "Cobranças", href: "/cobrancas", icon: Receipt, tone: "amber" },
   { title: "Contas a Receber", href: "/contas-receber", icon: Wallet, tone: "cyan" },
   { title: "Contas a Pagar", href: "/contas-pagar", icon: ArrowRightLeft, tone: "orange" },
   { title: "Relatórios", href: "/relatorios", icon: FileText, tone: "fuchsia" },
   { title: "Categorias", href: "/categorias", icon: Tags, tone: "lime" },
+  { title: "Sócio", href: "/socio", icon: Handshake, tone: "purple" },
+  { title: "Configuração", href: "/configuracao", icon: Settings, tone: "slate" },
 ];
 
 const whatsappSubItems: NavItem[] = [
@@ -172,6 +185,29 @@ function NavLinks({ onClick }: { onClick?: () => void }) {
   );
 }
 
+function BrandMark({ compact = false }: { compact?: boolean }) {
+  const branding = useSystemBranding();
+
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      {branding.logoDataUrl ? (
+        <img
+          src={branding.logoDataUrl}
+          alt="Logo do sistema"
+          className={`${compact ? "h-8 w-8" : "h-9 w-9"} shrink-0 rounded-md object-contain`}
+        />
+      ) : (
+        <span
+          className={`${compact ? "h-8 w-8" : "h-9 w-9"} inline-flex shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary`}
+        >
+          <Wallet className={compact ? "h-4 w-4" : "h-5 w-5"} />
+        </span>
+      )}
+      <span className="truncate text-lg font-bold">Sistema Financeiro</span>
+    </div>
+  );
+}
+
 export default function Shell({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -179,7 +215,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const displayName = user?.user_metadata?.name ?? user?.email ?? "Usuário";
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row bg-muted/20">
+    <div className="flex min-h-screen min-w-0 flex-col md:flex-row bg-muted/20 overflow-x-hidden">
       {/* Mobile Header */}
       <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-background px-4 md:hidden">
         <div className="flex items-center gap-3">
@@ -192,14 +228,14 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-0">
               <div className="flex h-16 items-center border-b px-6">
-                <span className="text-lg font-bold">Sistema Financeiro</span>
+                <BrandMark />
               </div>
               <div className="overflow-y-auto h-[calc(100vh-4rem)]">
                 <NavLinks onClick={() => setIsMobileOpen(false)} />
               </div>
             </SheetContent>
           </Sheet>
-          <span className="text-lg font-bold">Sistema Financeiro</span>
+          <BrandMark compact />
         </div>
         <Button variant="ghost" size="icon" onClick={signOut} title="Sair">
           <LogOut className="h-5 w-5" />
@@ -209,7 +245,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       {/* Desktop Sidebar */}
       <aside className="hidden w-64 flex-col border-r bg-background md:flex fixed inset-y-0">
         <div className="flex h-16 items-center border-b px-6">
-          <span className="text-lg font-bold">Sistema Financeiro</span>
+          <BrandMark />
         </div>
         <div className="flex-1 overflow-y-auto">
           <NavLinks />
@@ -241,7 +277,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 md:pl-64">
+      <main className="flex-1 min-w-0 md:pl-64 overflow-x-hidden">
         <div className="hidden md:flex h-16 items-center justify-end px-8 border-b bg-background/50 backdrop-blur-sm sticky top-0 z-30">
           <Button
             variant="ghost"
@@ -251,7 +287,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
         </div>
-        <div className="p-4 md:p-8 max-w-7xl mx-auto">
+        <div className="w-full min-w-0 p-4 md:p-8 max-w-7xl mx-auto">
           {children}
         </div>
       </main>

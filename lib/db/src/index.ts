@@ -1,13 +1,10 @@
-import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
-import dns from "node:dns";
-import pg from "pg";
+import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import postgres, { type Sql } from "postgres";
 import * as schema from "./schema";
 
-const { Pool } = pg;
+type Database = PostgresJsDatabase<typeof schema>;
 
-type Database = NodePgDatabase<typeof schema>;
-
-let poolInstance: pg.Pool | null = null;
+let clientInstance: Sql | null = null;
 let dbInstance: Database | null = null;
 
 function resolveDatabaseUrl(): string | null {
@@ -15,51 +12,17 @@ function resolveDatabaseUrl(): string | null {
   return rawUrl ?? null;
 }
 
-function createSupabaseLookup(hostname: string) {
-  return async (
-    lookupHost: string,
-    _options: dns.LookupOneOptions,
-    callback: (error: NodeJS.ErrnoException | null, address?: string, family?: number) => void,
-  ) => {
-    try {
-      if (hostname.endsWith(".supabase.co") && lookupHost === hostname) {
-        const records = await dns.promises.resolve6(lookupHost);
-        if (records[0]) {
-          callback(null, records[0], 6);
-          return;
-        }
-      }
-
-      const records = await dns.promises.resolve4(lookupHost);
-      if (records[0]) {
-        callback(null, records[0], 4);
-        return;
-      }
-
-      callback(new Error(`Unable to resolve ${lookupHost}`));
-    } catch (error) {
-      callback(error as NodeJS.ErrnoException);
-    }
-  };
-}
-
-function createPool(connectionString: string): pg.Pool {
+function createClient(connectionString: string): Sql {
   const { hostname } = new URL(connectionString);
   const isSupabaseHost =
     hostname.endsWith(".supabase.co") || hostname.endsWith(".pooler.supabase.com");
 
-  return new Pool({
-    connectionString,
-    ...(hostname.endsWith(".supabase.co")
-      ? {
-          lookup: createSupabaseLookup(hostname),
-        }
-      : {}),
+  return postgres(connectionString, {
+    max: 1,
+    prepare: false,
     ...(isSupabaseHost
       ? {
-          ssl: {
-            rejectUnauthorized: false,
-          },
+          ssl: "require",
         }
       : {}),
   });
@@ -74,12 +37,12 @@ function createDb(): Database {
     );
   }
 
-  if (!poolInstance) {
-    poolInstance = createPool(connectionString);
+  if (!clientInstance) {
+    clientInstance = createClient(connectionString);
   }
 
   if (!dbInstance) {
-    dbInstance = drizzle(poolInstance, { schema });
+    dbInstance = drizzle({ client: clientInstance, schema });
   }
 
   return dbInstance;
@@ -95,7 +58,7 @@ export function getDb(): Database {
 
 export const db = new Proxy({} as Database, {
   get(_target, property) {
-    const instance = createDb() as Record<PropertyKey, unknown>;
+    const instance = createDb() as unknown as Record<PropertyKey, unknown>;
     const value = instance[property];
     return typeof value === "function" ? value.bind(instance) : value;
   },

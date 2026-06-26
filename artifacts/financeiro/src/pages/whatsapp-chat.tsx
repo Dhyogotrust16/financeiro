@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
+import { useEvolutionConfig } from "@/hooks/use-whatsapp-config";
+import type { EvoConfig } from "@/lib/whatsapp-config";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,8 +23,6 @@ import {
 import { Label } from "@/components/ui/label";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-const STORAGE_KEY = "evo_config";
-interface EvoConfig { apiUrl: string; apiKey: string; instanceName: string; }
 interface Tag { id: number; name: string; color: string; }
 interface Department { id: number; name: string; color: string; }
 interface QuickReply { id: number; shortcut: string; title: string; body: string; }
@@ -53,9 +53,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string;
 type TabView = "queue" | "chats" | "contacts";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function getConfig(): EvoConfig | null {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null"); } catch { return null; }
-}
 function formatTime(ts: number) {
   if (!ts) return "";
   const d = new Date(ts * 1000);
@@ -93,12 +90,18 @@ async function apiFetch(path: string, opts?: RequestInit) {
   return r.json();
 }
 
+function evolutionRecipient(jid: string) {
+  if (!jid) return jid;
+  if (jid.endsWith("@g.us")) return jid;
+  return jid.split("@")[0];
+}
+
 async function fetchContacts(cfg: EvoConfig): Promise<Contact[]> {
   const rows: any[] = await apiFetch(`/api/whatsapp/chats/${cfg.instanceName}`);
   return rows.map(r => ({
     id: r.remote_jid,
     name: r.name ?? r.push_name ?? r.remote_jid.replace(/@.+/, ""),
-    phone: r.remote_jid.endsWith("@g.us") ? "Grupo" : `+${r.remote_jid.replace("@s.whatsapp.net", "")}`,
+    phone: r.remote_jid.endsWith("@g.us") ? "Grupo" : `+${evolutionRecipient(r.remote_jid)}`,
     isGroup: r.remote_jid.endsWith("@g.us"),
     lastMessage: r.last_message ?? "",
     lastMessageTime: Number(r.last_message_time) || 0,
@@ -125,25 +128,37 @@ async function fetchMessages(cfg: EvoConfig, jid: string): Promise<Message[]> {
     type: (r.message_type as Message["type"]) ?? "text",
   }));
 }
+async function syncMessages(cfg: EvoConfig, jid: string) {
+  return apiFetch(`/api/whatsapp/messages/${cfg.instanceName}/${encodeURIComponent(jid)}/sync`, { method: "POST" });
+}
 async function sendText(cfg: EvoConfig, jid: string, text: string) {
-  return fetch("/api/evolution/proxy", {
+  return apiFetch("/api/evolution/proxy", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiUrl: cfg.apiUrl, apiKey: cfg.apiKey, path: `/message/sendText/${cfg.instanceName}`, body: { number: jid, text } }),
+    body: JSON.stringify({
+      apiUrl: cfg.apiUrl,
+      apiKey: cfg.apiKey,
+      path: `/message/sendText/${cfg.instanceName}`,
+      body: { number: evolutionRecipient(jid), text },
+    }),
   });
 }
 async function sendMediaFile(instanceName: string, jid: string, file: File) {
   return new Promise<void>((resolve, reject) => {
     const fr = new FileReader();
     fr.onload = async () => {
-      const b64 = (fr.result as string).split(",")[1];
-      const mt = file.type.startsWith("image/") ? "image" : file.type.startsWith("audio/") ? "audio" : file.type.startsWith("video/") ? "video" : "document";
-      await fetch(`/api/whatsapp/send-media/${instanceName}`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ number: jid, mediatype: mt, mimetype: file.type, fileName: file.name, media: b64 }),
-      });
-      resolve();
+      try {
+        const b64 = (fr.result as string).split(",")[1];
+        const mt = file.type.startsWith("image/") ? "image" : file.type.startsWith("audio/") ? "audio" : file.type.startsWith("video/") ? "video" : "document";
+        await apiFetch(`/api/whatsapp/send-media/${instanceName}`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ number: evolutionRecipient(jid), mediatype: mt, mimetype: file.type, fileName: file.name, media: b64 }),
+        });
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
     };
-    fr.onerror = reject;
+    fr.onerror = () => reject(new Error("Falha ao ler o arquivo anexado"));
     fr.readAsDataURL(file);
   });
 }
@@ -652,7 +667,7 @@ function RightPanel({ contact, cfg, allTags, departments, agentName, onUpdate, o
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function WhatsAppChat() {
-  const cfg = getConfig();
+  const { config: cfg, isReady } = useEvolutionConfig();
   const { user } = useAuth();
   const agentName = user?.user_metadata?.name ?? user?.email?.split("@")[0] ?? "Você";
 
@@ -677,13 +692,13 @@ export default function WhatsAppChat() {
   const [showClose, setShowClose] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const syncedChatsRef = useRef<Set<string>>(new Set());
 
   const reload = useCallback(async () => {
     if (!cfg) return;
     setLoading(true); setError(null);
     try {
-      fetch(`/api/whatsapp/chats/${cfg.instanceName}/fix-group-names`, { method: "POST" }).catch(() => {});
-      const data = await fetchContacts(cfg);
+      let data = await fetchContacts(cfg);
       setContacts(prev => {
         // Detect new unread messages for notification
         const prevTotal = prev.reduce((s, c) => s + (c.unread ?? 0), 0);
@@ -710,6 +725,10 @@ export default function WhatsAppChat() {
       if (!data.length) setError("Nenhuma conversa. Verifique se o WhatsApp está conectado.");
     } catch (e: any) { setError(e.message); }
     setLoading(false);
+  }, [cfg?.instanceName]);
+
+  useEffect(() => {
+    syncedChatsRef.current.clear();
   }, [cfg?.instanceName]);
 
   const loadMeta = useCallback(async () => {
@@ -744,7 +763,19 @@ export default function WhatsAppChat() {
     let cancelled = false;
     const load = async () => {
       setLoadingMsgs(true);
-      try { const m = await fetchMessages(cfg, selected.id); if (!cancelled) setMessages(m); } catch { /* */ }
+      try {
+        let m = await fetchMessages(cfg, selected.id);
+        if (!syncedChatsRef.current.has(selected.id)) {
+          syncedChatsRef.current.add(selected.id);
+          if (!m.length) {
+            await syncMessages(cfg, selected.id).catch(() => null);
+            m = await fetchMessages(cfg, selected.id);
+          } else {
+            void syncMessages(cfg, selected.id).catch(() => null);
+          }
+        }
+        if (!cancelled) setMessages(m);
+      } catch { /* */ }
       if (!cancelled) setLoadingMsgs(false);
     };
     load();
@@ -814,6 +845,13 @@ export default function WhatsAppChat() {
   const unreadTotal = contacts.reduce((s, c) => s + (c.unread ?? 0) + (c.markedUnread ? 1 : 0), 0);
   const filteredQR = quickReplies.filter(q => q.shortcut.includes(qrFilter) || q.title.toLowerCase().includes(qrFilter));
 
+  if (!isReady && !cfg) return (
+    <div className="flex flex-col items-center justify-center h-[70vh] text-center gap-3 text-muted-foreground">
+      <Loader2 className="h-12 w-12 animate-spin" />
+      <p className="font-medium">Carregando configuração do WhatsApp...</p>
+    </div>
+  );
+
   if (!cfg) return (
     <div className="flex flex-col items-center justify-center h-[70vh] text-center gap-3 text-muted-foreground">
       <MessageCircleOff className="h-12 w-12" />
@@ -822,10 +860,10 @@ export default function WhatsAppChat() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] rounded-xl overflow-hidden border border-border shadow-sm bg-background">
+    <div className="flex h-[calc(100vh-8rem)] w-full min-w-0 rounded-xl overflow-hidden border border-border shadow-sm bg-background">
 
       {/* ── Sidebar ────────────────────────────────────────────────────────── */}
-      <div className={`flex flex-col w-full md:w-[320px] md:min-w-[320px] border-r border-border bg-background ${mobileView === "chat" ? "hidden md:flex" : "flex"}`}>
+      <div className={`flex flex-col w-full shrink-0 md:w-[320px] md:min-w-[320px] border-r border-border bg-background ${mobileView === "chat" ? "hidden md:flex" : "flex"}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2.5 bg-[#f0f2f5] dark:bg-[#202c33] border-b border-border">
           <div className="flex items-center gap-2">
@@ -879,8 +917,8 @@ export default function WhatsAppChat() {
       </div>
 
       {/* ── Chat area ──────────────────────────────────────────────────────── */}
-      <div className={`flex flex-col flex-1 min-w-0 ${mobileView === "list" ? "hidden md:flex" : "flex"}`}
-        style={{ background: "hsl(var(--muted)/0.15)" }}>
+        <div className={`flex flex-col flex-1 min-w-0 ${mobileView === "list" ? "hidden md:flex" : "flex"}`}
+          style={{ background: "hsl(var(--muted)/0.15)" }}>
         {selected ? (
           <>
             {/* Header */}
@@ -907,7 +945,7 @@ export default function WhatsAppChat() {
                 {!selected.isGroup && (
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" title="Ligar pelo WhatsApp"
                     onClick={() => {
-                      const num = selected.id.replace("@s.whatsapp.net", "");
+                      const num = evolutionRecipient(selected.id);
                       window.open(`https://wa.me/${num}`, "_blank");
                     }}>
                     <Phone className="h-4 w-4" />

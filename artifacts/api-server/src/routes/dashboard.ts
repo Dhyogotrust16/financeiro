@@ -100,18 +100,43 @@ router.get("/client-profitability", requireAuth, async (req, res) => {
     const allBillings = await db.select().from(billingsTable)
       .where(and(eq(billingsTable.userId, userId), eq(billingsTable.clientId, client.id)));
     const totalBilled = allBillings.reduce((s, b) => s + parseFloat(b.totalAmount), 0);
-    const totalPaid = allBillings.filter(b => b.status === "pago").reduce((s, b) => s + parseFloat(b.totalAmount), 0);
+    const paidBillings = allBillings.filter(b => b.status === "pago").reduce((s, b) => s + parseFloat(b.totalAmount), 0);
+    const pendingBillings = allBillings.filter(b => b.status === "pendente").reduce((s, b) => s + parseFloat(b.totalAmount), 0);
+
+    const receivedRows = await db.select({ amount: revenuesTable.amount }).from(revenuesTable)
+      .where(and(eq(revenuesTable.userId, userId), eq(revenuesTable.clientId, client.id), eq(revenuesTable.status, "recebido")));
+    const totalReceived = receivedRows.reduce((s, r) => s + parseFloat(r.amount), 0);
+
+    const pendingRevenueRows = await db.select({ amount: revenuesTable.amount }).from(revenuesTable)
+      .where(and(eq(revenuesTable.userId, userId), eq(revenuesTable.clientId, client.id), eq(revenuesTable.status, "pendente")));
+    const pendingRevenues = pendingRevenueRows.reduce((s, r) => s + parseFloat(r.amount), 0);
+
+    const expenseRows = await db.select({ amount: expensesTable.amount }).from(expensesTable)
+      .where(and(eq(expensesTable.userId, userId), eq(expensesTable.clientId, client.id)));
+    const totalExpenses = expenseRows.reduce((s, e) => s + parseFloat(e.amount), 0);
+
+    const pendingAmount = pendingBillings + pendingRevenues;
+    const netProfit = totalReceived - totalExpenses;
+    const margin = totalReceived > 0 ? (netProfit / totalReceived) * 100 : 0;
+
     result.push({
       clientId: client.id,
       clientName: client.name,
       totalBilled,
-      totalPaid,
-      pendingAmount: totalBilled - totalPaid,
+      totalPaid: totalReceived,
+      paidBillings,
+      totalReceived,
+      totalExpenses,
+      netProfit,
+      margin,
+      pendingAmount,
       billingCount: allBillings.length,
+      revenueCount: receivedRows.length,
+      expenseCount: expenseRows.length,
     });
   }
 
-  result.sort((a, b) => b.totalBilled - a.totalBilled);
+  result.sort((a, b) => b.netProfit - a.netProfit);
   res.json(result);
 });
 

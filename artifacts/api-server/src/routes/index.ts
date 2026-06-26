@@ -9,6 +9,7 @@ import billingsPdfRouter from "./billings-pdf";
 import dashboardRouter from "./dashboard";
 import payablesRouter from "./payables";
 import evolutionProxyRouter from "./evolution-proxy";
+import whatsappSettingsRouter from "./whatsapp-settings";
 import whatsappWebhookRouter from "./whatsapp-webhook";
 
 const router: IRouter = Router();
@@ -23,6 +24,7 @@ router.use("/billings", billingsPdfRouter);
 router.use("/dashboard", dashboardRouter);
 router.use("/payables", payablesRouter);
 router.use("/evolution", evolutionProxyRouter);
+router.use("/whatsapp", whatsappSettingsRouter);
 router.use("/whatsapp", whatsappWebhookRouter);
 
 export default router;

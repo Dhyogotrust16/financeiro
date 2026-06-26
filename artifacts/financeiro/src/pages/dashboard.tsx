@@ -4,15 +4,52 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, AreaChart, Area, CartesianGrid } from "recharts";
 import { ArrowDownIcon, ArrowUpIcon, CreditCard, DollarSign, Users, AlertCircle, Wallet } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect } from "react";
+import {
+  getCachedDashboardCashflow,
+  getCachedDashboardSummary,
+  saveCachedDashboardCashflow,
+  saveCachedDashboardSummary,
+} from "@/lib/dashboard-cache";
 
 export default function Dashboard() {
   const date = new Date();
   const currentYear = date.getFullYear();
   const currentMonth = date.getMonth() + 1;
 
-  const { data: summary, isLoading: isLoadingSummary } = useGetDashboardSummary(currentYear, currentMonth);
-  const { data: cashflow, isLoading: isLoadingCashflow } = useGetDashboardCashflow();
-  const { data: profitability, isLoading: isLoadingProfitability } = useGetClientProfitability();
+  const liveQueryOptions = {
+    staleTime: 0,
+    refetchOnMount: "always" as const,
+    refetchOnWindowFocus: true,
+  } as any;
+
+  const { data: summary, isLoading: isLoadingSummary } = useGetDashboardSummary(currentYear, currentMonth, {
+    query: {
+      ...liveQueryOptions,
+      initialData: () => getCachedDashboardSummary(currentYear, currentMonth),
+    } as any,
+  });
+  const { data: cashflow, isLoading: isLoadingCashflow } = useGetDashboardCashflow({
+    query: {
+      ...liveQueryOptions,
+      initialData: getCachedDashboardCashflow,
+    } as any,
+  });
+  const { data: profitability, isLoading: isLoadingProfitability } = useGetClientProfitability({
+    query: liveQueryOptions,
+  });
+
+  useEffect(() => {
+    if (summary) {
+      saveCachedDashboardSummary(currentYear, currentMonth, summary);
+    }
+  }, [currentMonth, currentYear, summary]);
+
+  useEffect(() => {
+    if (Array.isArray(cashflow)) {
+      saveCachedDashboardCashflow(cashflow);
+    }
+  }, [cashflow]);
 
   return (
     <div className="space-y-8">

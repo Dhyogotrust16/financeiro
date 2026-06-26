@@ -3,6 +3,29 @@ import type { Request, Response } from "express";
 
 const router = Router();
 
+function normalizeEvolutionRecipient(value: string | undefined) {
+  if (!value) return value;
+  if (value.endsWith("@g.us")) return value;
+  return value.split("@")[0];
+}
+
+function normalizeEvolutionBody(path: string, body: unknown) {
+  if (!path.startsWith("/message/sendText/") && !path.startsWith("/message/sendMedia/")) {
+    return body;
+  }
+
+  if (!body || typeof body !== "object" || Array.isArray(body)) return body;
+
+  const payload = { ...(body as Record<string, unknown>) };
+  if (typeof payload.number === "string") {
+    payload.number = normalizeEvolutionRecipient(payload.number);
+  } else if (typeof payload.groupJid === "string" && typeof payload.number === "undefined") {
+    payload.number = normalizeEvolutionRecipient(payload.groupJid);
+  }
+
+  return payload;
+}
+
 // POST /evolution/proxy
 // Body: { apiUrl, apiKey, path, body? }
 // Proxies the request to the Evolution API server-side, bypassing CORS.
@@ -22,13 +45,14 @@ router.post("/proxy", async (req: Request, res: Response) => {
   const url = `${apiUrl.replace(/\/+$/, "")}${path}`;
 
   try {
+    const normalizedBody = normalizeEvolutionBody(path, body);
     const upstream = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         apikey: apiKey,
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: normalizedBody !== undefined ? JSON.stringify(normalizedBody) : undefined,
     });
 
     const text = await upstream.text();

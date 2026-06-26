@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,20 +10,16 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useEvolutionConfig } from "@/hooks/use-whatsapp-config";
+import {
+  EMPTY_EVOLUTION_CONFIG,
+  clearStoredEvolutionDraft,
+  readStoredEvolutionDraft,
+  ensureEvolutionWebhook,
+  storeEvolutionDraft,
+  type EvoConfig,
+} from "@/lib/whatsapp-config";
 import { Smartphone, Wifi, WifiOff, RefreshCw, LogOut, Settings, QrCode, Loader2 } from "lucide-react";
-
-// ---------------------------------------------------------------------------
-// Types & constants
-// ---------------------------------------------------------------------------
-
-const STORAGE_KEY = "evo_config";
-const DRAFT_KEY = "evo_config_draft";
-
-interface EvoConfig {
-  apiUrl: string;
-  apiKey: string;
-  instanceName: string;
-}
 
 type ConnectionState = "open" | "close" | "connecting" | null;
 
@@ -62,6 +59,14 @@ async function createInstance(config: EvoConfig) {
       instanceName: config.instanceName,
       qrcode: true,
       integration: "WHATSAPP-BAILEYS",
+      settings: {
+        syncFullHistory: true,
+        groupsIgnore: false,
+        alwaysOnline: false,
+        readMessages: false,
+        readStatus: false,
+        rejectCall: false,
+      },
     }),
   });
 }
@@ -98,17 +103,14 @@ async function deleteInstance(config: EvoConfig) {
 
 export default function WhatsApp() {
   const { toast } = useToast();
+  const { getToken } = useAuth();
+  const { config, isReady, saveConfig: persistConfig } = useEvolutionConfig();
 
-  const [config, setConfig] = useState<EvoConfig | null>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [draftConfig, setDraftConfig] = useState<Partial<EvoConfig> | null>(() => readStoredEvolutionDraft());
+  const [showConfig, setShowConfig] = useState(() => !config || Boolean(readStoredEvolutionDraft()));
+  const [savingConfig, setSavingConfig] = useState(false);
+  const suppressDraftSyncRef = useRef(false);
 
-  const [showConfig, setShowConfig] = useState(!config);
   const [connectionState, setConnectionState] = useState<ConnectionState>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [loadingQr, setLoadingQr] = useState(false);
@@ -117,24 +119,36 @@ export default function WhatsApp() {
 
   const form = useForm<ConfigForm>({
     resolver: zodResolver(configSchema),
-    defaultValues: () => {
-      // Prefer saved config, then draft, then empty
-      if (config) return Promise.resolve(config);
-      try {
-        const draft = localStorage.getItem(DRAFT_KEY);
-        if (draft) return Promise.resolve(JSON.parse(draft));
-      } catch {}
-      return Promise.resolve({ apiUrl: "", apiKey: "", instanceName: "" });
-    },
+    defaultValues: draftConfig ? { ...EMPTY_EVOLUTION_CONFIG, ...draftConfig } : config ?? EMPTY_EVOLUTION_CONFIG,
   });
 
-  // Persist draft on every change so navigation doesn't lose the values
   useEffect(() => {
     const sub = form.watch((values) => {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(values));
+      if (suppressDraftSyncRef.current) {
+        return;
+      }
+      setDraftConfig(values);
+      storeEvolutionDraft(values);
     });
     return () => sub.unsubscribe();
   }, [form]);
+
+  useEffect(() => {
+    if (config) {
+      if (!draftConfig) {
+        setShowConfig(false);
+        form.reset(config);
+      }
+      return;
+    }
+
+    if (isReady) {
+      setShowConfig(true);
+      if (!draftConfig) {
+        form.reset(EMPTY_EVOLUTION_CONFIG);
+      }
+    }
+  }, [config, draftConfig, form, isReady]);
 
   // ------------------------------------------------------------------
   // Poll connection state when config is set
@@ -142,10 +156,15 @@ export default function WhatsApp() {
   const refreshState = useCallback(async () => {
     if (!config) return;
     setLoadingState(true);
-    const state = await fetchConnectionState(config);
-    setConnectionState(state);
-    setLoadingState(false);
-    if (state === "open") setQrCode(null);
+    try {
+      const state = await fetchConnectionState(config);
+      if (state !== null) {
+        setConnectionState(state);
+        if (state === "open") setQrCode(null);
+      }
+    } finally {
+      setLoadingState(false);
+    }
   }, [config]);
 
   useEffect(() => {
@@ -159,15 +178,26 @@ export default function WhatsApp() {
   // Handlers
   // ------------------------------------------------------------------
 
-  function saveConfig(values: ConfigForm) {
-    const cfg: EvoConfig = values;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
-    localStorage.removeItem(DRAFT_KEY);
-    setConfig(cfg);
-    setShowConfig(false);
-    setConnectionState(null);
-    setQrCode(null);
-    toast({ title: "Configuração salva" });
+  async function handleSaveConfig(values: ConfigForm) {
+    setSavingConfig(true);
+    try {
+      const saved = await persistConfig(values);
+      clearStoredEvolutionDraft();
+      setDraftConfig(null);
+      setShowConfig(false);
+      setConnectionState(null);
+      setQrCode(null);
+      suppressDraftSyncRef.current = true;
+      form.reset(saved);
+      setTimeout(() => {
+        suppressDraftSyncRef.current = false;
+      }, 0);
+      toast({ title: "Configuração salva" });
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar configuração", description: err?.message ?? "Falha inesperada", variant: "destructive" });
+    } finally {
+      setSavingConfig(false);
+    }
   }
 
   async function handleConnect() {
@@ -176,6 +206,7 @@ export default function WhatsApp() {
     try {
       // Try to create instance (may already exist — that's fine)
       await createInstance(config).catch(() => null);
+      await ensureEvolutionWebhook(getToken).catch(() => null);
       const qr = await fetchQrCode(config);
       if (qr) {
         setQrCode(qr);
@@ -236,6 +267,15 @@ export default function WhatsApp() {
   const isConnected = connectionState === "open";
   const isConnecting = connectionState === "connecting";
 
+  if (!isReady && !config && !draftConfig) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh] gap-3 text-muted-foreground">
+        <Loader2 className="h-10 w-10 animate-spin" />
+        <p>Carregando configuração do WhatsApp...</p>
+      </div>
+    );
+  }
+
   function StatusBadge() {
     if (loadingState) return <Badge variant="outline"><Loader2 className="h-3 w-3 animate-spin mr-1" />Verificando</Badge>;
     if (connectionState === null) return <Badge variant="secondary">Não verificado</Badge>;
@@ -272,7 +312,7 @@ export default function WhatsApp() {
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(saveConfig)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(handleSaveConfig)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="apiUrl"
@@ -318,7 +358,10 @@ export default function WhatsApp() {
                       Cancelar
                     </Button>
                   )}
-                  <Button type="submit">Salvar configuração</Button>
+                  <Button type="submit" disabled={savingConfig}>
+                    {savingConfig ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Salvar configuração
+                  </Button>
                 </div>
               </form>
             </Form>

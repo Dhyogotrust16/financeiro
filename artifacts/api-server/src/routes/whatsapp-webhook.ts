@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { resolveEvolutionConfig } from "../lib/whatsapp-settings";
 
 const router = Router();
 
@@ -34,6 +35,361 @@ function normalizeJid(jid: string): string {
   return jid?.split(":")[0] ?? jid;
 }
 
+function normalizeEvolutionRecipient(value: string | undefined) {
+  if (!value) return value;
+  if (value.endsWith("@g.us")) return value;
+  return value.split("@")[0];
+}
+
+function normalizeWebhookEventName(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase().replace(/[_-]+/g, ".");
+}
+
+function isHistorySyncEvent(event: string | null | undefined) {
+  const normalized = normalizeWebhookEventName(event);
+  return normalized === "messages.set" || normalized === "messaging.history.set";
+}
+
+function isMessageEvent(event: string | null | undefined) {
+  const normalized = normalizeWebhookEventName(event);
+  return [
+    "send.message",
+    "messages.upsert",
+    "message",
+    "messages.set",
+    "messaging.history.set",
+  ].includes(normalized);
+}
+
+function extractMessageBatch(payload: any): any[] {
+  const data = payload?.data;
+  const candidates = [
+    data?.messages,
+    payload?.messages,
+    Array.isArray(data) ? data : null,
+    data,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  const single = data && typeof data === "object" ? data : payload;
+  if (single && typeof single === "object" && (single.key || single.remoteJid || single.message)) {
+    return [single];
+  }
+
+  return [];
+}
+
+function extractRecordJid(record: any): string {
+  return normalizeJid(record?.key?.remoteJid ?? record?.remoteJid ?? record?.jid ?? record?.id ?? "");
+}
+
+function extractRecordName(record: any): string | null {
+  return (
+    record?.name ??
+    record?.pushName ??
+    record?.notify ??
+    record?.subject ??
+    record?.fullName ??
+    record?.verifiedName ??
+    null
+  );
+}
+
+function extractRecordTimestamp(record: any): number {
+  return (
+    Number(
+      record?.messageTimestamp ??
+      record?.timestamp ??
+      record?.conversationTimestamp ??
+      record?.lastMessage?.messageTimestamp ??
+      record?.lastMessage?.timestamp ??
+      Math.floor(Date.now() / 1000),
+    ) || Math.floor(Date.now() / 1000)
+  );
+}
+
+function extractRecordBody(record: any): string {
+  if (!record) return "";
+  if (typeof record === "string") return record;
+  return extractBody(record?.message ?? record?.lastMessage?.message ?? record?.lastMessage ?? record?.content ?? record);
+}
+
+async function upsertChatRow(
+  instance: string,
+  remoteJid: string,
+  opts: {
+    name?: string | null;
+    pushName?: string | null;
+    lastMessage?: string | null;
+    lastMessageTime?: number | null;
+    unreadCount?: number;
+    incrementUnread?: boolean;
+  },
+) {
+  const isGroupJid = remoteJid.endsWith("@g.us");
+  const hasLastMessage = Boolean(opts.lastMessage);
+  const lastMessage = opts.lastMessage ?? null;
+  const lastMessageTime = Number(opts.lastMessageTime ?? 0) || Math.floor(Date.now() / 1000);
+  const unreadCount = Number(opts.unreadCount ?? 0) || 0;
+  const incrementUnread = Boolean(opts.incrementUnread);
+
+  await db.execute(sql`
+    INSERT INTO whatsapp_chats (instance_name, remote_jid, name, push_name, last_message, last_message_time, unread_count, status, protocol, updated_at)
+    VALUES (${instance}, ${remoteJid}, ${opts.name ?? null}, ${isGroupJid ? null : opts.pushName ?? null}, ${lastMessage}, ${lastMessageTime}, ${unreadCount}, 'open', LPAD(nextval('whatsapp_protocol_seq')::TEXT, 6, '0'), NOW())
+    ON CONFLICT (instance_name, remote_jid) DO UPDATE
+    SET last_message = CASE
+          WHEN ${hasLastMessage} AND EXCLUDED.last_message_time >= whatsapp_chats.last_message_time THEN EXCLUDED.last_message
+          ELSE whatsapp_chats.last_message
+        END,
+        last_message_time = CASE
+          WHEN ${hasLastMessage} THEN GREATEST(EXCLUDED.last_message_time, whatsapp_chats.last_message_time)
+          ELSE whatsapp_chats.last_message_time
+        END,
+        push_name = CASE WHEN ${isGroupJid} THEN whatsapp_chats.push_name ELSE COALESCE(EXCLUDED.push_name, whatsapp_chats.push_name) END,
+        name = CASE WHEN ${isGroupJid} THEN COALESCE(whatsapp_chats.name, EXCLUDED.name) ELSE COALESCE(EXCLUDED.name, whatsapp_chats.name) END,
+        unread_count = CASE
+          WHEN ${incrementUnread} THEN whatsapp_chats.unread_count + 1
+          ELSE GREATEST(whatsapp_chats.unread_count, EXCLUDED.unread_count)
+        END,
+        updated_at = NOW()
+  `);
+}
+
+async function queryRows<T = any>(query: any): Promise<T[]> {
+  return (await db.execute(query)) as any[];
+}
+
+async function upsertMessageRow(
+  instance: string,
+  record: any,
+  opts: {
+    historySync?: boolean;
+    groupNameLookup?: boolean;
+  } = {},
+) {
+  const historySync = Boolean(opts.historySync);
+  const key = record?.key ?? {};
+  const remoteJid = normalizeJid(key?.remoteJid ?? record?.remoteJid ?? "");
+  if (!remoteJid) return null;
+
+  const fromMe: boolean = key?.fromMe ?? record?.fromMe ?? false;
+  const messageId: string = key?.id ?? record?.id ?? `${Date.now()}-${Math.random()}`;
+  const timestamp: number = record?.messageTimestamp ?? record?.timestamp ?? Math.floor(Date.now() / 1000);
+  const pushName: string = record?.pushName ?? "";
+  const msgContent = record?.message ?? {};
+  const body: string = extractBody(msgContent);
+  const type: string = msgType(msgContent);
+  const shouldIncrementUnread = !historySync && !fromMe;
+
+  await db.execute(sql`
+    INSERT INTO whatsapp_messages (id, instance_name, remote_jid, from_me, push_name, message_type, body, timestamp, raw)
+    VALUES (${messageId}, ${instance}, ${remoteJid}, ${fromMe}, ${pushName}, ${type}, ${body}, ${timestamp}, ${JSON.stringify(record)}::jsonb)
+    ON CONFLICT (id) DO UPDATE SET body = EXCLUDED.body, raw = EXCLUDED.raw
+  `);
+
+  const isGroupJid = remoteJid.endsWith("@g.us");
+  const chatName: string | null = isGroupJid
+    ? (record?.name ?? null)
+    : (!fromMe && pushName ? pushName : null);
+
+  await upsertChatRow(instance, remoteJid, {
+    name: chatName,
+    pushName: isGroupJid ? null : pushName,
+    lastMessage: body,
+    lastMessageTime: timestamp,
+    unreadCount: shouldIncrementUnread ? 1 : 0,
+    incrementUnread: shouldIncrementUnread,
+  });
+
+  console.log(`[webhook] saved msg ${messageId} for ${remoteJid} fromMe=${fromMe}`);
+
+  if (isGroupJid && !historySync && opts.groupNameLookup !== false) {
+    const existing = await queryRows<{ name: string | null }>(sql`
+      SELECT name FROM whatsapp_chats WHERE instance_name = ${instance} AND remote_jid = ${remoteJid} AND name IS NOT NULL LIMIT 1
+    `);
+    if (!existing[0]?.name) {
+      try {
+        const evoConfig = await resolveEvolutionConfig();
+        if (evoConfig) {
+          const resp = await fetch(`${evoConfig.apiUrl}/group/findGroupInfos/${instance}?groupJid=${remoteJid}`, {
+            headers: { apikey: evoConfig.apiKey },
+          });
+          if (resp.ok) {
+            const info = await resp.json() as any;
+            const groupName = info?.subject ?? info?.name ?? null;
+            if (groupName) {
+              await db.execute(sql`
+                UPDATE whatsapp_chats SET name = ${groupName} WHERE instance_name = ${instance} AND remote_jid = ${remoteJid}
+              `);
+            }
+          }
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
+  return { remoteJid, messageId };
+}
+
+async function evolutionFetchJson(
+  config: { apiUrl: string; apiKey: string },
+  path: string,
+  body?: unknown,
+  timeoutMs = 8000,
+) {
+  const url = `${config.apiUrl.replace(/\/+$/, "")}${path}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: config.apiKey,
+    },
+    signal: controller.signal,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  }).finally(() => {
+    clearTimeout(timer);
+  });
+
+  let text = "";
+  try {
+    text = await response.text();
+  } catch {
+    text = "";
+  }
+  let data: unknown = text;
+  try {
+    data = text ? JSON.parse(text) : "";
+  } catch {
+    // keep text
+  }
+
+  if (!response.ok) {
+    const detail = typeof data === "string" ? data : JSON.stringify(data);
+    throw new Error(`Evolution API ${response.status}: ${detail}`);
+  }
+
+  return data;
+}
+
+function extractEvolutionRecords(payload: any): any[] {
+  const candidates = [
+    payload,
+    payload?.data,
+    payload?.messages,
+    payload?.chats,
+    payload?.contacts,
+    payload?.records,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+
+    if (candidate && typeof candidate === "object") {
+      if (Array.isArray(candidate.records)) return candidate.records;
+      if (Array.isArray(candidate.items)) return candidate.items;
+      if (Array.isArray(candidate.messages)) return candidate.messages;
+      if (Array.isArray(candidate.chats)) return candidate.chats;
+      if (Array.isArray(candidate.contacts)) return candidate.contacts;
+    }
+  }
+
+  return [];
+}
+
+async function syncChatsFromEvolution(instance: string, options: { limit?: number } = {}) {
+  const evoConfig = await resolveEvolutionConfig();
+  if (!evoConfig) {
+    return { ok: false, reason: "Evolution API configuration not found" };
+  }
+
+  const limit = Math.max(25, Math.min(Number(options.limit ?? 100), 250));
+  const maxPages = 1;
+  let total = 0;
+
+  for (let page = 1; page <= maxPages; page++) {
+    const payload = await evolutionFetchJson(
+      evoConfig,
+      `/chat/findChats/${encodeURIComponent(instance)}?page=${page}&limit=${limit}`,
+      {},
+    );
+    const pageInfo = payload as any;
+    const records = extractEvolutionRecords(payload);
+    if (!records.length) break;
+
+    for (const chat of records) {
+      const remoteJid = extractRecordJid(chat);
+      if (!remoteJid) continue;
+
+      const lastMessage = chat?.lastMessage ? extractRecordBody(chat.lastMessage) : null;
+      await upsertChatRow(instance, remoteJid, {
+        name: extractRecordName(chat),
+        pushName: remoteJid.endsWith("@g.us") ? null : (chat?.pushName ?? chat?.notify ?? null),
+        lastMessage,
+        lastMessageTime: extractRecordTimestamp(chat),
+        unreadCount: Number(chat?.unreadCount ?? chat?.unread_count ?? 0) || 0,
+        incrementUnread: false,
+      });
+      total += 1;
+    }
+
+    const pageCount = Number(pageInfo?.pages ?? pageInfo?.chats?.pages ?? pageInfo?.messages?.pages ?? 0) || 0;
+    if ((pageCount && page >= pageCount) || records.length < limit) break;
+  }
+
+  return { ok: true, synced: total };
+}
+
+async function syncMessagesFromEvolution(instance: string, remoteJid: string, options: { limit?: number } = {}) {
+  const evoConfig = await resolveEvolutionConfig();
+  if (!evoConfig) {
+    return { ok: false, reason: "Evolution API configuration not found" };
+  }
+
+  const limit = Math.max(25, Math.min(Number(options.limit ?? 200), 500));
+  const maxPages = 5;
+  let total = 0;
+
+  for (let page = 1; page <= maxPages; page++) {
+    const payload = await evolutionFetchJson(
+      evoConfig,
+      `/chat/findMessages/${encodeURIComponent(instance)}?page=${page}&limit=${limit}`,
+      {
+        where: {
+          key: {
+            remoteJid,
+          },
+        },
+      },
+    );
+    const pageInfo = payload as any;
+    const records = extractEvolutionRecords(payload);
+    if (!records.length) break;
+
+    for (const record of records) {
+      const saved = await upsertMessageRow(instance, record, {
+        historySync: true,
+        groupNameLookup: false,
+      });
+      if (saved) total += 1;
+    }
+
+    const pageCount = Number(pageInfo?.pages ?? pageInfo?.messages?.pages ?? pageInfo?.chats?.pages ?? 0) || 0;
+    if ((pageCount && page >= pageCount) || records.length < limit) break;
+  }
+
+  return { ok: true, synced: total };
+}
+
 // POST /whatsapp/webhook/:instance
 router.post("/webhook/:instance", async (req, res) => {
   const { instance } = req.params;
@@ -43,92 +399,49 @@ router.post("/webhook/:instance", async (req, res) => {
   console.log("[webhook] event payload:", JSON.stringify(payload).slice(0, 600));
 
   const event = payload?.event ?? payload?.type;
+  const historySync = isHistorySyncEvent(event);
 
   try {
     // Evolution API v2 payload formats:
-    // event: "send.message" | "messages.upsert" — data is a single message or array
-    const isMessageEvent =
-      event === "send.message" ||
-      event === "messages.upsert" ||
-      event === "message" ||
-      event === "MESSAGES_UPSERT" ||
-      event === "SEND_MESSAGE";
-
-    if (isMessageEvent) {
-      // Normalize to array
-      const raw = payload?.data;
-      const messages: any[] = Array.isArray(raw)
-        ? raw
-        : Array.isArray(raw?.messages)
-        ? raw.messages
-        : raw ? [raw] : [];
+    // event: "send.message" | "messages.upsert" | "messages.set" — data is a message batch or history sync payload
+    if (isMessageEvent(event)) {
+      const messages = extractMessageBatch(payload);
 
       for (const m of messages) {
-        const key = m.key ?? {};
-        const remoteJid = normalizeJid(key?.remoteJid ?? m.remoteJid ?? "");
-        if (!remoteJid) continue;
+        await upsertMessageRow(instance, m, { historySync });
+      }
 
-        const fromMe: boolean = key?.fromMe ?? m.fromMe ?? false;
-        const messageId: string = key?.id ?? m.id ?? `${Date.now()}-${Math.random()}`;
-        const timestamp: number = m.messageTimestamp ?? m.timestamp ?? Math.floor(Date.now() / 1000);
-        const pushName: string = m.pushName ?? "";
-        const msgContent = m.message ?? {};
-        const body: string = extractBody(msgContent);
-        const type: string = msgType(msgContent);
+      if (historySync) {
+        const syncData = (payload?.data ?? {}) as any;
+        const chats: any[] = Array.isArray(syncData?.chats) ? syncData.chats : [];
+        for (const chat of chats) {
+          const remoteJid = extractRecordJid(chat);
+          if (!remoteJid) continue;
 
-        // Upsert message
-        await db.execute(sql`
-          INSERT INTO whatsapp_messages (id, instance_name, remote_jid, from_me, push_name, message_type, body, timestamp, raw)
-          VALUES (${messageId}, ${instance}, ${remoteJid}, ${fromMe}, ${pushName}, ${type}, ${body}, ${timestamp}, ${JSON.stringify(m)}::jsonb)
-          ON CONFLICT (id) DO UPDATE SET body = EXCLUDED.body, raw = EXCLUDED.raw
-        `);
+          const lastMessage = chat?.lastMessage ? extractRecordBody(chat.lastMessage) : null;
+          await upsertChatRow(instance, remoteJid, {
+            name: extractRecordName(chat),
+            pushName: remoteJid.endsWith("@g.us") ? null : (chat?.pushName ?? chat?.notify ?? null),
+            lastMessage,
+            lastMessageTime: extractRecordTimestamp(chat),
+            unreadCount: Number(chat?.unreadCount ?? chat?.unread_count ?? 0) || 0,
+            incrementUnread: false,
+          });
+        }
 
-        // Upsert chat
-        // For groups: name comes from the group JID info, NOT from pushName (which is sender name)
-        const isGroupJid = remoteJid.endsWith("@g.us");
-        const chatName: string | null = isGroupJid
-          ? (m.name ?? null)          // group name if provided in payload
-          : (!fromMe && pushName ? pushName : null);
-        await db.execute(sql`
-          INSERT INTO whatsapp_chats (instance_name, remote_jid, name, push_name, last_message, last_message_time, unread_count, status, protocol, updated_at)
-          VALUES (${instance}, ${remoteJid}, ${chatName}, ${isGroupJid ? null : pushName}, ${body}, ${timestamp}, ${fromMe ? 0 : 1}, 'open', LPAD(nextval('whatsapp_protocol_seq')::TEXT, 6, '0'), NOW())
-          ON CONFLICT (instance_name, remote_jid) DO UPDATE
-          SET last_message = CASE WHEN EXCLUDED.last_message_time >= whatsapp_chats.last_message_time THEN EXCLUDED.last_message ELSE whatsapp_chats.last_message END,
-              last_message_time = GREATEST(EXCLUDED.last_message_time, whatsapp_chats.last_message_time),
-              push_name = CASE WHEN ${isGroupJid} THEN whatsapp_chats.push_name ELSE COALESCE(EXCLUDED.push_name, whatsapp_chats.push_name) END,
-              name = CASE WHEN ${isGroupJid} THEN COALESCE(whatsapp_chats.name, EXCLUDED.name) ELSE COALESCE(EXCLUDED.name, whatsapp_chats.name) END,
-              unread_count = whatsapp_chats.unread_count + (CASE WHEN ${fromMe} THEN 0 ELSE 1 END),
-              updated_at = NOW()
-        `);
+        const contacts: any[] = Array.isArray(syncData?.contacts) ? syncData.contacts : [];
+        for (const contact of contacts) {
+          const remoteJid = extractRecordJid(contact);
+          if (!remoteJid) continue;
 
-        console.log(`[webhook] saved msg ${messageId} for ${remoteJid} fromMe=${fromMe}`);
-
-        // For groups, fetch group name from Evolution if not stored yet
-        if (isGroupJid) {
-          const existing = await db.execute(sql`
-            SELECT name FROM whatsapp_chats WHERE instance_name = ${instance} AND remote_jid = ${remoteJid} AND name IS NOT NULL LIMIT 1
-          `);
-          if (!existing.rows[0]?.name) {
-            // Try to get group info from Evolution
-            try {
-              const evoUrl = process.env.EVOLUTION_API_URL ?? "http://localhost:8080";
-              const evoKey = process.env.EVOLUTION_API_KEY ?? "";
-              if (evoKey) {
-                const resp = await fetch(`${evoUrl}/group/findGroupInfos/${instance}?groupJid=${remoteJid}`, {
-                  headers: { apikey: evoKey },
-                });
-                if (resp.ok) {
-                  const info = await resp.json() as any;
-                  const groupName = info?.subject ?? info?.name ?? null;
-                  if (groupName) {
-                    await db.execute(sql`
-                      UPDATE whatsapp_chats SET name = ${groupName} WHERE instance_name = ${instance} AND remote_jid = ${remoteJid}
-                    `);
-                  }
-                }
-              }
-            } catch { /* ignore */ }
-          }
+          await upsertChatRow(instance, remoteJid, {
+            name: extractRecordName(contact),
+            pushName: remoteJid.endsWith("@g.us") ? null : (contact?.pushName ?? contact?.notify ?? null),
+            lastMessage: null,
+            lastMessageTime: 0,
+            unreadCount: Number(contact?.unreadCount ?? contact?.unread_count ?? 0) || 0,
+            incrementUnread: false,
+          });
         }
       }
     }
@@ -140,28 +453,54 @@ router.post("/webhook/:instance", async (req, res) => {
   }
 });
 
+router.post("/chats/:instance/sync", async (req, res) => {
+  const { instance } = req.params;
+  const { limit } = (req.body ?? {}) as { limit?: number };
+
+  try {
+    const result = await syncChatsFromEvolution(instance, { limit });
+    res.json(result);
+  } catch (err: any) {
+    console.warn(`[whatsapp-webhook] chat sync failed for ${instance}: ${err?.message}`);
+    res.status(502).json({ ok: false, error: err?.message ?? "Falha ao sincronizar chats" });
+  }
+});
+
 // GET /whatsapp/chats/:instance — list chats from our DB
 router.get("/chats/:instance", async (req, res) => {
   const { instance } = req.params;
-  const result = await db.execute(sql`
+  const rows = await queryRows(sql`
     SELECT * FROM whatsapp_chats
     WHERE instance_name = ${instance}
     ORDER BY last_message_time DESC
     LIMIT 200
   `);
-  res.json(result.rows);
+  res.json(rows);
+});
+
+router.post("/messages/:instance/:jid/sync", async (req, res) => {
+  const { instance, jid } = req.params;
+  const { limit } = (req.body ?? {}) as { limit?: number };
+
+  try {
+    const result = await syncMessagesFromEvolution(instance, jid, { limit });
+    res.json(result);
+  } catch (err: any) {
+    console.warn(`[whatsapp-webhook] message sync failed for ${instance}/${jid}: ${err?.message}`);
+    res.status(502).json({ ok: false, error: err?.message ?? "Falha ao sincronizar mensagens" });
+  }
 });
 
 // GET /whatsapp/messages/:instance/:jid — list messages from our DB
 router.get("/messages/:instance/:jid", async (req, res) => {
   const { instance, jid } = req.params;
-  const result = await db.execute(sql`
+  const rows = await queryRows(sql`
     SELECT * FROM whatsapp_messages
     WHERE instance_name = ${instance} AND remote_jid = ${jid}
     ORDER BY timestamp ASC
     LIMIT 100
   `);
-  res.json(result.rows);
+  res.json(rows);
 });
 
 // PATCH /whatsapp/chats/:instance/:jid/name — update chat name
@@ -189,26 +528,26 @@ router.patch("/chats/:instance/:jid", async (req, res) => {
     await db.execute(sql`UPDATE whatsapp_chats SET tags = ${tags}::TEXT[] WHERE instance_name = ${instance} AND remote_jid = ${jid}`);
   if (internalNotes !== undefined)
     await db.execute(sql`UPDATE whatsapp_chats SET internal_notes = ${internalNotes} WHERE instance_name = ${instance} AND remote_jid = ${jid}`);
-  const result = await db.execute(sql`SELECT * FROM whatsapp_chats WHERE instance_name = ${instance} AND remote_jid = ${jid}`);
-  res.json(result.rows[0] ?? { ok: true });
+  const rows = await queryRows(sql`SELECT * FROM whatsapp_chats WHERE instance_name = ${instance} AND remote_jid = ${jid}`);
+  res.json(rows[0] ?? { ok: true });
 });
 
 // GET /whatsapp/tags/:instance
 router.get("/tags/:instance", async (req, res) => {
   const { instance } = req.params;
-  const result = await db.execute(sql`SELECT * FROM whatsapp_tags WHERE instance_name = ${instance} ORDER BY name`);
-  res.json(result.rows);
+  const rows = await queryRows(sql`SELECT * FROM whatsapp_tags WHERE instance_name = ${instance} ORDER BY name`);
+  res.json(rows);
 });
 
 // POST /whatsapp/tags/:instance
 router.post("/tags/:instance", async (req, res) => {
   const { instance } = req.params;
   const { name, color } = req.body as { name: string; color?: string };
-  const result = await db.execute(sql`
+  const rows = await queryRows(sql`
     INSERT INTO whatsapp_tags (instance_name, name, color) VALUES (${instance}, ${name}, ${color ?? "#6366f1"})
     ON CONFLICT (instance_name, name) DO UPDATE SET color = EXCLUDED.color RETURNING *
   `);
-  res.json(result.rows[0]);
+  res.json(rows[0] ?? { ok: true });
 });
 
 // DELETE /whatsapp/tags/:instance/:tagname
@@ -222,20 +561,20 @@ router.delete("/tags/:instance/:tagname", async (req, res) => {
 
 router.get("/quick-replies/:instance", async (req, res) => {
   const { instance } = req.params;
-  const result = await db.execute(sql`SELECT * FROM whatsapp_quick_replies WHERE instance_name = ${instance} ORDER BY shortcut`);
-  res.json(result.rows);
+  const rows = await queryRows(sql`SELECT * FROM whatsapp_quick_replies WHERE instance_name = ${instance} ORDER BY shortcut`);
+  res.json(rows);
 });
 
 router.post("/quick-replies/:instance", async (req, res) => {
   const { instance } = req.params;
   const { shortcut, title, body } = req.body as { shortcut: string; title: string; body: string };
-  const result = await db.execute(sql`
+  const rows = await queryRows(sql`
     INSERT INTO whatsapp_quick_replies (instance_name, shortcut, title, body)
     VALUES (${instance}, ${shortcut}, ${title}, ${body})
     ON CONFLICT (instance_name, shortcut) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body
     RETURNING *
   `);
-  res.json(result.rows[0]);
+  res.json(rows[0] ?? { ok: true });
 });
 
 router.delete("/quick-replies/:instance/:id", async (req, res) => {
@@ -249,15 +588,34 @@ router.delete("/quick-replies/:instance/:id", async (req, res) => {
 router.post("/send-media/:instance", async (req, res) => {
   const { instance } = req.params;
   const { number, mediatype, mimetype, caption, fileName, media } = req.body;
-  const evoUrl = (process.env.EVOLUTION_API_URL ?? "http://localhost:8080").replace(/\/+$/, "");
-  const evoKey = process.env.EVOLUTION_API_KEY ?? "";
   try {
+    const evoConfig = await resolveEvolutionConfig();
+    if (!evoConfig) {
+      res.status(503).json({ error: "Evolution API configuration not found" });
+      return;
+    }
+
+    const evoUrl = evoConfig.apiUrl.replace(/\/+$/, "");
+    const evoKey = evoConfig.apiKey;
     const upstream = await fetch(`${evoUrl}/message/sendMedia/${instance}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: evoKey },
-      body: JSON.stringify({ number, mediatype, mimetype, caption: caption ?? "", fileName: fileName ?? "file", media }),
+      body: JSON.stringify({
+        number: normalizeEvolutionRecipient(number),
+        mediatype,
+        mimetype,
+        caption: caption ?? "",
+        fileName: fileName ?? "file",
+        media,
+      }),
     });
-    const data = await upstream.json();
+    const text = await upstream.text();
+    let data: unknown;
+    try {
+      data = text ? JSON.parse(text) : "";
+    } catch {
+      data = text;
+    }
     res.status(upstream.status).json(data);
   } catch (err: any) {
     res.status(502).json({ error: err?.message });
@@ -268,18 +626,18 @@ router.post("/send-media/:instance", async (req, res) => {
 
 router.get("/departments/:instance", async (req, res) => {
   const { instance } = req.params;
-  const result = await db.execute(sql`SELECT * FROM whatsapp_departments WHERE instance_name = ${instance} ORDER BY name`);
-  res.json(result.rows);
+  const rows = await queryRows(sql`SELECT * FROM whatsapp_departments WHERE instance_name = ${instance} ORDER BY name`);
+  res.json(rows);
 });
 
 router.post("/departments/:instance", async (req, res) => {
   const { instance } = req.params;
   const { name, color } = req.body as { name: string; color?: string };
-  const result = await db.execute(sql`
+  const rows = await queryRows(sql`
     INSERT INTO whatsapp_departments (instance_name, name, color) VALUES (${instance}, ${name}, ${color ?? "#6366f1"})
     ON CONFLICT (instance_name, name) DO UPDATE SET color = EXCLUDED.color RETURNING *
   `);
-  res.json(result.rows[0]);
+  res.json(rows[0] ?? { ok: true });
 });
 
 router.delete("/departments/:instance/:id", async (req, res) => {
@@ -307,8 +665,8 @@ router.post("/chats/:instance/:jid/transfer", async (req, res) => {
         ELSE internal_notes END
     WHERE instance_name = ${instance} AND remote_jid = ${jid}
   `);
-  const result = await db.execute(sql`SELECT * FROM whatsapp_chats WHERE instance_name = ${instance} AND remote_jid = ${jid}`);
-  res.json(result.rows[0] ?? { ok: true });
+  const rows = await queryRows(sql`SELECT * FROM whatsapp_chats WHERE instance_name = ${instance} AND remote_jid = ${jid}`);
+  res.json(rows[0] ?? { ok: true });
 });
 
 // ── Close chamado ─────────────────────────────────────────────────────────────
@@ -324,8 +682,8 @@ router.post("/chats/:instance/:jid/close", async (req, res) => {
         subject = ${subject ?? null}
     WHERE instance_name = ${instance} AND remote_jid = ${jid}
   `);
-  const result = await db.execute(sql`SELECT * FROM whatsapp_chats WHERE instance_name = ${instance} AND remote_jid = ${jid}`);
-  res.json(result.rows[0]);
+  const rows = await queryRows(sql`SELECT * FROM whatsapp_chats WHERE instance_name = ${instance} AND remote_jid = ${jid}`);
+  res.json(rows[0] ?? { ok: true });
 });
 
 // ── Mark unread ───────────────────────────────────────────────────────────────
@@ -345,8 +703,8 @@ router.post("/chats/:instance/:jid/reopen", async (req, res) => {
     SET status = 'open', closed_at = NULL, closed_by = NULL, opened_at = NOW(), unread_count = 0, marked_unread = FALSE
     WHERE instance_name = ${instance} AND remote_jid = ${jid}
   `);
-  const result = await db.execute(sql`SELECT * FROM whatsapp_chats WHERE instance_name = ${instance} AND remote_jid = ${jid}`);
-  res.json(result.rows[0]);
+  const rows = await queryRows(sql`SELECT * FROM whatsapp_chats WHERE instance_name = ${instance} AND remote_jid = ${jid}`);
+  res.json(rows[0] ?? { ok: true });
 });
 
 // ── Metrics ──────────────────────────────────────────────────────────────────
@@ -354,95 +712,53 @@ router.post("/chats/:instance/:jid/reopen", async (req, res) => {
 router.get("/metrics/:instance", async (req, res) => {
   const { instance } = req.params;
 
-  const totals = await db.execute(sql`
+  const totals = await queryRows(sql`
     SELECT status, COUNT(*) as count
     FROM whatsapp_chats WHERE instance_name = ${instance}
     GROUP BY status
   `);
 
-  const unread = await db.execute(sql`
+  const unread = await queryRows(sql`
     SELECT SUM(unread_count) as total FROM whatsapp_chats WHERE instance_name = ${instance}
   `);
 
   const today = new Date().toISOString().split("T")[0];
-  const todayMsgs = await db.execute(sql`
+  const todayMsgs = await queryRows(sql`
     SELECT COUNT(*) as count FROM whatsapp_messages
     WHERE instance_name = ${instance} AND created_at::date = ${today}::date
   `);
 
-  const recentChats = await db.execute(sql`
+  const recentChats = await queryRows(sql`
     SELECT DATE(updated_at) as day, COUNT(*) as count
     FROM whatsapp_chats WHERE instance_name = ${instance}
       AND updated_at >= NOW() - INTERVAL '7 days'
     GROUP BY day ORDER BY day ASC
   `);
 
-  const tagStats = await db.execute(sql`
+  const tagStats = await queryRows(sql`
     SELECT unnest(tags) as tag, COUNT(*) as count
     FROM whatsapp_chats WHERE instance_name = ${instance} AND array_length(tags,1) > 0
     GROUP BY tag ORDER BY count DESC LIMIT 10
   `);
 
   res.json({
-    byStatus: totals.rows,
-    unreadTotal: Number((unread.rows[0] as any)?.total ?? 0),
-    todayMessages: Number((todayMsgs.rows[0] as any)?.count ?? 0),
-    recentActivity: recentChats.rows,
-    topTags: tagStats.rows,
+    byStatus: totals,
+    unreadTotal: Number((unread[0] as any)?.total ?? 0),
+    todayMessages: Number((todayMsgs[0] as any)?.count ?? 0),
+    recentActivity: recentChats,
+    topTags: tagStats,
   });
 });
 
 // POST /whatsapp/chats/:instance/fix-group-names — fetches group names from Evolution and updates DB
 router.post("/chats/:instance/fix-group-names", async (req, res) => {
   const { instance } = req.params;
-  const evoUrl = (process.env.EVOLUTION_API_URL ?? "http://localhost:8080").replace(/\/+$/, "");
-  const evoKey = process.env.EVOLUTION_API_KEY ?? "";
-
-  const chats = await db.execute(sql`
-    SELECT remote_jid FROM whatsapp_chats WHERE instance_name = ${instance}
-  `);
-
-  let fixed = 0;
-  for (const row of chats.rows as any[]) {
-    const jid: string = row.remote_jid;
-    const isGroupJid = jid.endsWith("@g.us");
-
-    try {
-      // Fetch profile picture for all chats
-      const phone = jid.replace("@s.whatsapp.net", "").replace("@g.us", "");
-      const picRes = await fetch(`${evoUrl}/chat/fetchProfilePictureUrl/${instance}`, {
-        method: "POST",
-        headers: { apikey: evoKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ number: phone }),
-      });
-      if (picRes.ok) {
-        const picData = await picRes.json() as any;
-        const picUrl: string | null = picData?.profilePictureUrl ?? null;
-        if (picUrl) {
-          await db.execute(sql`UPDATE whatsapp_chats SET profile_pic = ${picUrl} WHERE instance_name = ${instance} AND remote_jid = ${jid}`);
-        }
-      }
-    } catch { /* ignore */ }
-
-    // For groups also fix name
-    if (isGroupJid) {
-      try {
-        const r = await fetch(`${evoUrl}/group/findGroupInfos/${instance}?groupJid=${encodeURIComponent(jid)}`, {
-          headers: { apikey: evoKey },
-        });
-        if (r.ok) {
-          const info = await r.json() as any;
-          const name: string | null = info?.subject ?? info?.name ?? null;
-          if (name) {
-            await db.execute(sql`UPDATE whatsapp_chats SET name = ${name} WHERE instance_name = ${instance} AND remote_jid = ${jid}`);
-            fixed++;
-          }
-        }
-      } catch { /* ignore */ }
-    }
-  }
-
-  res.json({ ok: true, fixed });
+  res.json({
+    ok: true,
+    fixed: 0,
+    skipped: true,
+    message: "Group names are now resolved by webhook/history sync.",
+  });
 });
 
 // POST /whatsapp/messages/:instance/:jid/read — mark as read
@@ -459,35 +775,35 @@ router.post("/messages/:instance/:jid/read", async (req, res) => {
 
 router.get("/comments/:instance/:jid", async (req, res) => {
   const { instance, jid } = req.params;
-  const result = await db.execute(sql`
+  const rows = await queryRows(sql`
     SELECT * FROM whatsapp_internal_comments
     WHERE instance_name = ${instance} AND remote_jid = ${jid}
     ORDER BY created_at ASC
   `);
-  res.json(result.rows);
+  res.json(rows);
 });
 
 router.post("/comments/:instance/:jid", async (req, res) => {
   const { instance, jid } = req.params;
   const { author, body } = req.body as { author: string; body: string };
-  const result = await db.execute(sql`
+  const rows = await queryRows(sql`
     INSERT INTO whatsapp_internal_comments (instance_name, remote_jid, author, body)
     VALUES (${instance}, ${jid}, ${author}, ${body})
     RETURNING *
   `);
-  res.json(result.rows[0]);
+  res.json(rows[0] ?? { ok: true });
 });
 
 // ── Scheduled messages ────────────────────────────────────────────────────────
 
 router.get("/scheduled/:instance", async (req, res) => {
   const { instance } = req.params;
-  const result = await db.execute(sql`
+  const rows = await queryRows(sql`
     SELECT * FROM whatsapp_scheduled
     WHERE instance_name = ${instance} AND sent = FALSE AND scheduled_at > NOW()
     ORDER BY scheduled_at ASC
   `);
-  res.json(result.rows);
+  res.json(rows);
 });
 
 router.post("/scheduled/:instance", async (req, res) => {
@@ -495,12 +811,12 @@ router.post("/scheduled/:instance", async (req, res) => {
   const { remoteJid, body, scheduledAt, createdBy } = req.body as {
     remoteJid: string; body: string; scheduledAt: string; createdBy?: string;
   };
-  const result = await db.execute(sql`
+  const rows = await queryRows(sql`
     INSERT INTO whatsapp_scheduled (instance_name, remote_jid, body, scheduled_at, created_by)
     VALUES (${instance}, ${remoteJid}, ${body}, ${scheduledAt}::TIMESTAMPTZ, ${createdBy ?? null})
     RETURNING *
   `);
-  res.json(result.rows[0]);
+  res.json(rows[0] ?? { ok: true });
 });
 
 router.delete("/scheduled/:instance/:id", async (req, res) => {
@@ -513,12 +829,12 @@ router.delete("/scheduled/:instance/:id", async (req, res) => {
 
 router.get("/contact-fields/:instance/:jid", async (req, res) => {
   const { instance, jid } = req.params;
-  const result = await db.execute(sql`
+  const rows = await queryRows(sql`
     SELECT field_key, field_value FROM whatsapp_contact_fields
     WHERE instance_name = ${instance} AND remote_jid = ${jid}
   `);
   const fields: Record<string, string> = {};
-  for (const row of result.rows as any[]) fields[row.field_key] = row.field_value;
+  for (const row of rows as any[]) fields[row.field_key] = row.field_value;
   res.json(fields);
 });
 
@@ -541,7 +857,7 @@ router.get("/history/:instance", async (req, res) => {
   const { instance } = req.params;
   const { search, limit = "50", offset = "0" } = req.query as Record<string, string>;
   const searchPattern = search ? `%${search}%` : null;
-  const result = await db.execute(
+  const rows = await queryRows(
     searchPattern
       ? sql`SELECT * FROM whatsapp_chats WHERE instance_name = ${instance} AND status = 'resolved'
             AND (name ILIKE ${searchPattern} OR protocol ILIKE ${searchPattern} OR subject ILIKE ${searchPattern})
@@ -549,7 +865,7 @@ router.get("/history/:instance", async (req, res) => {
       : sql`SELECT * FROM whatsapp_chats WHERE instance_name = ${instance} AND status = 'resolved'
             ORDER BY closed_at DESC NULLS LAST LIMIT ${Number(limit)} OFFSET ${Number(offset)}`
   );
-  res.json(result.rows);
+  res.json(rows);
 });
 
 // ── Live overview ─────────────────────────────────────────────────────────────
@@ -557,26 +873,26 @@ router.get("/history/:instance", async (req, res) => {
 router.get("/overview/:instance", async (req, res) => {
   const { instance } = req.params;
   const [active, queue, pending, resolved, todayResolved] = await Promise.all([
-    db.execute(sql`SELECT COUNT(*) as c FROM whatsapp_chats WHERE instance_name = ${instance} AND status = 'attending'`),
-    db.execute(sql`SELECT COUNT(*) as c FROM whatsapp_chats WHERE instance_name = ${instance} AND status = 'open'`),
-    db.execute(sql`SELECT COUNT(*) as c FROM whatsapp_chats WHERE instance_name = ${instance} AND status = 'pending'`),
-    db.execute(sql`SELECT COUNT(*) as c FROM whatsapp_chats WHERE instance_name = ${instance} AND status = 'resolved'`),
-    db.execute(sql`SELECT COUNT(*) as c FROM whatsapp_chats WHERE instance_name = ${instance} AND status = 'resolved' AND closed_at::date = CURRENT_DATE`),
+    queryRows(sql`SELECT COUNT(*) as c FROM whatsapp_chats WHERE instance_name = ${instance} AND status = 'attending'`),
+    queryRows(sql`SELECT COUNT(*) as c FROM whatsapp_chats WHERE instance_name = ${instance} AND status = 'open'`),
+    queryRows(sql`SELECT COUNT(*) as c FROM whatsapp_chats WHERE instance_name = ${instance} AND status = 'pending'`),
+    queryRows(sql`SELECT COUNT(*) as c FROM whatsapp_chats WHERE instance_name = ${instance} AND status = 'resolved'`),
+    queryRows(sql`SELECT COUNT(*) as c FROM whatsapp_chats WHERE instance_name = ${instance} AND status = 'resolved' AND closed_at::date = CURRENT_DATE`),
   ]);
-  const unread = await db.execute(sql`SELECT SUM(unread_count) as u FROM whatsapp_chats WHERE instance_name = ${instance}`);
-  const agents = await db.execute(sql`
+  const unread = await queryRows(sql`SELECT SUM(unread_count) as u FROM whatsapp_chats WHERE instance_name = ${instance}`);
+  const agents = await queryRows(sql`
     SELECT assigned_to, COUNT(*) as chats FROM whatsapp_chats
     WHERE instance_name = ${instance} AND status = 'attending' AND assigned_to IS NOT NULL
     GROUP BY assigned_to ORDER BY chats DESC
   `);
   res.json({
-    attending: Number((active.rows[0] as any)?.c ?? 0),
-    queue: Number((queue.rows[0] as any)?.c ?? 0),
-    pending: Number((pending.rows[0] as any)?.c ?? 0),
-    resolved: Number((resolved.rows[0] as any)?.c ?? 0),
-    todayResolved: Number((todayResolved.rows[0] as any)?.c ?? 0),
-    unreadTotal: Number((unread.rows[0] as any)?.u ?? 0),
-    agentLoad: agents.rows,
+    attending: Number((active[0] as any)?.c ?? 0),
+    queue: Number((queue[0] as any)?.c ?? 0),
+    pending: Number((pending[0] as any)?.c ?? 0),
+    resolved: Number((resolved[0] as any)?.c ?? 0),
+    todayResolved: Number((todayResolved[0] as any)?.c ?? 0),
+    unreadTotal: Number((unread[0] as any)?.u ?? 0),
+    agentLoad: agents,
   });
 });
 

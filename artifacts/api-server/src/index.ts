@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { bootstrapEvolutionWebhook } from "./lib/whatsapp-settings";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,15 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  void bootstrapEvolutionWebhook(port)
+    .then((result) => {
+      if (!result.ok) {
+        logger.warn({ result }, "WhatsApp webhook bootstrap skipped");
+      } else {
+        logger.info({ url: result.url, status: result.status }, "WhatsApp webhook bootstrapped");
+      }
+    })
+    .catch((err) => {
+      logger.warn({ err }, "WhatsApp webhook bootstrap failed");
+    });
 });

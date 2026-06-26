@@ -17,8 +17,11 @@ import Despesas from "@/pages/despesas";
 import Cobrancas from "@/pages/cobrancas";
 import ContasReceber from "@/pages/contas-receber";
 import ContasPagar from "@/pages/contas-pagar";
+import Honorarios from "@/pages/honorarios";
 import Relatorios from "@/pages/relatorios";
 import Categorias from "@/pages/categorias";
+import Configuracao from "@/pages/configuracao";
+import Socio from "@/pages/socio";
 import WhatsApp from "@/pages/whatsapp";
 import WhatsAppChat from "@/pages/whatsapp-chat";
 import WhatsAppDashboard from "@/pages/whatsapp-dashboard";
@@ -72,8 +75,11 @@ function AppRoutes() {
       <Route path="/cobrancas" component={() => <ProtectedRoute component={Cobrancas} />} />
       <Route path="/contas-receber" component={() => <ProtectedRoute component={ContasReceber} />} />
       <Route path="/contas-pagar" component={() => <ProtectedRoute component={ContasPagar} />} />
+      <Route path="/honorarios" component={() => <ProtectedRoute component={Honorarios} />} />
       <Route path="/relatorios" component={() => <ProtectedRoute component={Relatorios} />} />
       <Route path="/categorias" component={() => <ProtectedRoute component={Categorias} />} />
+      <Route path="/socio" component={() => <ProtectedRoute component={Socio} />} />
+      <Route path="/configuracao" component={() => <ProtectedRoute component={Configuracao} />} />
       <Route path="/whatsapp" component={() => <ProtectedRoute component={WhatsApp} />} />
       <Route path="/whatsapp/chat" component={() => <ProtectedRoute component={WhatsAppChat} />} />
       <Route path="/whatsapp/dashboard" component={() => <ProtectedRoute component={WhatsAppDashboard} />} />

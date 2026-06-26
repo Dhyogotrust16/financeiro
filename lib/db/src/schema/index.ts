@@ -5,3 +5,4 @@ export * from "./expenses";
 export * from "./billings";
 export * from "./payables";
 export * from "./users";
+export * from "./whatsapp";

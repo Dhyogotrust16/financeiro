@@ -32,6 +32,16 @@ CREATE TABLE IF NOT EXISTS whatsapp_chats (
   PRIMARY KEY (instance_name, remote_jid)
 );
 CREATE INDEX IF NOT EXISTS idx_wachats_time ON whatsapp_chats(instance_name, last_message_time DESC);
+
+CREATE TABLE IF NOT EXISTS whatsapp_settings (
+  setting_key TEXT PRIMARY KEY,
+  api_url TEXT NOT NULL,
+  api_key TEXT NOT NULL,
+  instance_name TEXT NOT NULL,
+  webhook_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 `;
 
 const client = new Client({ connectionString: DB_URL });
