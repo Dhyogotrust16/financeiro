@@ -5,7 +5,9 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 const sourceDir = path.join(rootDir, "dist/public");
-const targetDir = path.join(rootDir, "public");
+const targetDir = process.env.VERCEL
+  ? path.resolve(rootDir, "../..", "public")
+  : path.join(rootDir, "public");
 
 if (!existsSync(sourceDir)) {
   throw new Error(`Frontend build output not found at ${sourceDir}`);
