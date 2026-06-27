@@ -11,6 +11,8 @@ import payablesRouter from "./payables";
 import evolutionProxyRouter from "./evolution-proxy";
 import whatsappSettingsRouter from "./whatsapp-settings";
 import whatsappWebhookRouter from "./whatsapp-webhook";
+import settingsRouter from "./settings";
+import partnersRouter from "./partners";
 
 const router: IRouter = Router();
 
@@ -26,5 +28,7 @@ router.use("/payables", payablesRouter);
 router.use("/evolution", evolutionProxyRouter);
 router.use("/whatsapp", whatsappSettingsRouter);
 router.use("/whatsapp", whatsappWebhookRouter);
+router.use("/settings", settingsRouter);
+router.use("/partners", partnersRouter);
 
 export default router;

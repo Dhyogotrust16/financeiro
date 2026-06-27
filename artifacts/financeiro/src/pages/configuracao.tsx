@@ -8,6 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { getSystemBranding, saveSystemBranding, useSystemBranding } from "@/lib/system-branding";
+import {
+  EMPTY_PROFILE_SETTINGS,
+  fetchUserProfileSettings,
+  saveUserProfileSettings,
+  type UserProfileSettings,
+} from "@/lib/user-settings";
 
 interface LocalProfile {
   phone: string;
@@ -38,7 +44,7 @@ function readLocalProfile(userId: string): LocalProfile {
 }
 
 export default function Configuracao() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, getToken, isLoaded } = useAuth();
   const { toast } = useToast();
   const branding = useSystemBranding();
   const userId = user?.id ?? "local";
@@ -53,6 +59,7 @@ export default function Configuracao() {
   const [bio, setBio] = useState(initialProfile.bio);
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(() => getSystemBranding().logoDataUrl);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
   useEffect(() => {
     const profile = readLocalProfile(userId);
@@ -66,6 +73,53 @@ export default function Configuracao() {
   useEffect(() => {
     setLogoDataUrl(branding.logoDataUrl);
   }, [branding.logoDataUrl]);
+
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+
+    let cancelled = false;
+
+    (async () => {
+      setIsLoadingSettings(true);
+
+      try {
+        const remote = await fetchUserProfileSettings(getToken);
+        if (cancelled) return;
+
+        const local = readLocalProfile(userId);
+        const localLogo = getSystemBranding().logoDataUrl;
+        const hasLocalProfile = Boolean(local.phone || local.role || local.company || local.bio || localLogo);
+        const hasRemoteProfile = Boolean(remote.phone || remote.role || remote.company || remote.bio || remote.logoDataUrl);
+        const profileToUse: UserProfileSettings =
+          hasLocalProfile && !hasRemoteProfile
+            ? await saveUserProfileSettings({ ...local, logoDataUrl: localLogo }, getToken)
+            : remote;
+
+        if (cancelled) return;
+        setPhone(profileToUse.phone);
+        setRole(profileToUse.role);
+        setCompany(profileToUse.company);
+        setBio(profileToUse.bio);
+        setLogoDataUrl(profileToUse.logoDataUrl);
+        saveSystemBranding({ logoDataUrl: profileToUse.logoDataUrl });
+      } catch {
+        if (!cancelled) {
+          const local = readLocalProfile(userId);
+          setPhone(local.phone);
+          setRole(local.role);
+          setCompany(local.company);
+          setBio(local.bio);
+          setLogoDataUrl(getSystemBranding().logoDataUrl);
+        }
+      } finally {
+        if (!cancelled) setIsLoadingSettings(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, isLoaded, user, userId]);
 
   function handleLogoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -114,16 +168,20 @@ export default function Configuracao() {
       }
 
       await updateProfile({ name: trimmedName });
-      window.localStorage.setItem(
-        profileStorageKey(userId),
-        JSON.stringify({
+      const saved = await saveUserProfileSettings(
+        {
+          ...EMPTY_PROFILE_SETTINGS,
           phone: phone.trim(),
           role: role.trim(),
           company: company.trim(),
           bio: bio.trim(),
-        }),
+          logoDataUrl,
+        },
+        getToken,
       );
-      saveSystemBranding({ logoDataUrl });
+      window.localStorage.setItem(profileStorageKey(userId), JSON.stringify(saved));
+      saveSystemBranding({ logoDataUrl: saved.logoDataUrl });
+      setLogoDataUrl(saved.logoDataUrl);
 
       toast({
         title: "Configurações salvas",
@@ -149,9 +207,9 @@ export default function Configuracao() {
             Atualize os dados do seu perfil e a identidade visual exibida no sistema.
           </p>
         </div>
-        <Button type="submit" disabled={isSaving}>
+        <Button type="submit" disabled={isSaving || isLoadingSettings}>
           <Save className="h-4 w-4" />
-          {isSaving ? "Salvando..." : "Salvar alterações"}
+          {isSaving ? "Salvando..." : isLoadingSettings ? "Carregando..." : "Salvar alterações"}
         </Button>
       </div>
 

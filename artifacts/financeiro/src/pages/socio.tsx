@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useGetDashboardSummary } from "@workspace/api-client-react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { BadgePercent, Handshake, Mail, Pencil, PieChart, Plus, Save, Trash2, UserRound, Wallet } from "lucide-react";
@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import { formatCurrency } from "@/lib/format";
+import { fetchPartners, savePartnersRemote } from "@/lib/user-settings";
 
 interface Partner {
   id: string;
@@ -44,12 +46,15 @@ function clampPercentage(value: number) {
 
 export default function Socio() {
   const { toast } = useToast();
+  const { getToken, isLoaded } = useAuth();
   const date = new Date();
   const currentYear = date.getFullYear();
   const currentMonth = date.getMonth() + 1;
   const { data: summary, isLoading } = useGetDashboardSummary(currentYear, currentMonth);
 
   const [partners, setPartners] = useState<Partner[]>(() => readPartners());
+  const [isLoadingPartners, setIsLoadingPartners] = useState(true);
+  const [isSavingPartners, setIsSavingPartners] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -80,6 +85,47 @@ export default function Socio() {
     [partnerRows],
   );
 
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    let cancelled = false;
+
+    (async () => {
+      setIsLoadingPartners(true);
+
+      try {
+        const remote = await fetchPartners(getToken);
+        if (cancelled) return;
+
+        if (remote.length === 0 && partners.length > 0) {
+          const migrated = await savePartnersRemote(partners, getToken);
+          if (!cancelled) {
+            setPartners(migrated);
+            savePartners(migrated);
+          }
+          return;
+        }
+
+        setPartners(remote);
+        savePartners(remote);
+      } catch {
+        if (!cancelled) {
+          toast({
+            title: "Nao foi possivel carregar os socios",
+            description: "Usando dados salvos neste navegador temporariamente.",
+            variant: "destructive",
+          });
+        }
+      } finally {
+        if (!cancelled) setIsLoadingPartners(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, isLoaded]);
+
   function resetForm() {
     setEditingId(null);
     setName("");
@@ -87,12 +133,27 @@ export default function Socio() {
     setPercentage("");
   }
 
-  function persist(nextPartners: Partner[]) {
-    setPartners(nextPartners);
-    savePartners(nextPartners);
+  async function persist(nextPartners: Partner[]) {
+    setIsSavingPartners(true);
+
+    try {
+      const saved = await savePartnersRemote(nextPartners, getToken);
+      setPartners(saved);
+      savePartners(saved);
+      return true;
+    } catch (error) {
+      toast({
+        title: "Erro ao salvar socios",
+        description: error instanceof Error ? error.message : "Tente novamente em instantes.",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsSavingPartners(false);
+    }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const trimmedName = name.trim();
@@ -138,9 +199,11 @@ export default function Socio() {
           },
         ];
 
-    persist(nextPartners);
-    resetForm();
-    toast({ title: editingId ? "Sócio atualizado" : "Sócio cadastrado" });
+    const saved = await persist(nextPartners);
+    if (saved) {
+      resetForm();
+      toast({ title: editingId ? "Sócio atualizado" : "Sócio cadastrado" });
+    }
   }
 
   function handleEdit(partner: Partner) {
@@ -150,10 +213,12 @@ export default function Socio() {
     setPercentage(String(partner.percentage).replace(".", ","));
   }
 
-  function handleDelete(partnerId: string) {
-    persist(partners.filter((partner) => partner.id !== partnerId));
-    if (editingId === partnerId) resetForm();
-    toast({ title: "Sócio removido" });
+  async function handleDelete(partnerId: string) {
+    const saved = await persist(partners.filter((partner) => partner.id !== partnerId));
+    if (saved) {
+      if (editingId === partnerId) resetForm();
+      toast({ title: "Sócio removido" });
+    }
   }
 
   return (
@@ -187,7 +252,7 @@ export default function Socio() {
             <Handshake className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{partners.length}</div>
+            <div className="text-2xl font-bold">{isLoadingPartners ? "..." : partners.length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -248,9 +313,9 @@ export default function Socio() {
                 </div>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
-                <Button type="submit" className="flex-1">
+                <Button type="submit" className="flex-1" disabled={isLoadingPartners || isSavingPartners}>
                   {editingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                  {editingId ? "Salvar sócio" : "Cadastrar sócio"}
+                  {isSavingPartners ? "Salvando..." : editingId ? "Salvar sócio" : "Cadastrar sócio"}
                 </Button>
                 {editingId && (
                   <Button type="button" variant="outline" onClick={resetForm}>

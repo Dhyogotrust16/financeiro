@@ -1,10 +1,13 @@
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from "wouter";
+import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { fetchUserProfileSettings } from "@/lib/user-settings";
+import { saveSystemBranding } from "@/lib/system-branding";
 
 import Home from "@/pages/home";
 import SignIn from "@/pages/sign-in";
@@ -51,6 +54,33 @@ function HomeRedirect() {
   return <Home />;
 }
 
+function RemoteBrandingSync() {
+  const { isLoaded, isSignedIn, getToken } = useAuth();
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const settings = await fetchUserProfileSettings(getToken);
+        if (!cancelled) {
+          saveSystemBranding({ logoDataUrl: settings.logoDataUrl });
+        }
+      } catch {
+        // Keep the local cached logo if the remote settings cannot be loaded.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, isLoaded, isSignedIn]);
+
+  return null;
+}
+
 function AppRoutes() {
   const { isLoaded } = useAuth();
 
@@ -95,6 +125,7 @@ function App() {
       <TooltipProvider>
         <AuthProvider>
           <QueryClientProvider client={queryClient}>
+            <RemoteBrandingSync />
             <WouterRouter base={basePath}>
               <AppRoutes />
             </WouterRouter>
