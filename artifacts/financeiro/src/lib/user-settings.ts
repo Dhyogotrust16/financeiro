@@ -23,8 +23,19 @@ export const EMPTY_PROFILE_SETTINGS: UserProfileSettings = {
   logoDataUrl: null,
 };
 
+function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error(message)), milliseconds);
+
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => window.clearTimeout(timeout));
+  });
+}
+
 async function authorizedRequest(path: string, getToken: () => Promise<string | null>, init: RequestInit = {}) {
-  const token = await getToken();
+  const token = await withTimeout(getToken(), 8000, "Sessao demorou para responder. Tente novamente.");
   if (!token) {
     throw new Error("Autenticacao indisponivel");
   }
@@ -36,11 +47,15 @@ async function authorizedRequest(path: string, getToken: () => Promise<string | 
   const timeout = window.setTimeout(() => controller.abort(), 10000);
 
   try {
-    return await fetch(`/api/${path}`, {
-      ...init,
-      headers,
-      signal: init.signal ?? controller.signal,
-    });
+    return await withTimeout(
+      fetch(`/api/${path}`, {
+        ...init,
+        headers,
+        signal: init.signal ?? controller.signal,
+      }),
+      12000,
+      "Servidor demorou para responder. Tente novamente.",
+    );
   } finally {
     window.clearTimeout(timeout);
   }

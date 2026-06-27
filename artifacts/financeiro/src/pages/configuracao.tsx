@@ -162,18 +162,20 @@ export default function Configuracao() {
         throw new Error("Informe o nome que será exibido no sistema.");
       }
 
+      const nextSettings = {
+        ...EMPTY_PROFILE_SETTINGS,
+        phone: phone.trim(),
+        role: role.trim(),
+        company: company.trim(),
+        bio: bio.trim(),
+        logoDataUrl,
+      };
+
+      window.localStorage.setItem(profileStorageKey(userId), JSON.stringify(nextSettings));
+      saveSystemBranding({ logoDataUrl });
+
       await updateProfile({ name: trimmedName });
-      const saved = await saveUserProfileSettings(
-        {
-          ...EMPTY_PROFILE_SETTINGS,
-          phone: phone.trim(),
-          role: role.trim(),
-          company: company.trim(),
-          bio: bio.trim(),
-          logoDataUrl,
-        },
-        getToken,
-      );
+      const saved = await saveUserProfileSettings(nextSettings, getToken);
       window.localStorage.setItem(profileStorageKey(userId), JSON.stringify(saved));
       saveSystemBranding({ logoDataUrl: saved.logoDataUrl });
       setLogoDataUrl(saved.logoDataUrl);
