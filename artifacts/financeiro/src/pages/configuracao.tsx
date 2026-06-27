@@ -59,7 +59,6 @@ export default function Configuracao() {
   const [bio, setBio] = useState(initialProfile.bio);
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(() => getSystemBranding().logoDataUrl);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
   useEffect(() => {
     const profile = readLocalProfile(userId);
@@ -80,8 +79,6 @@ export default function Configuracao() {
     let cancelled = false;
 
     (async () => {
-      setIsLoadingSettings(true);
-
       try {
         const remote = await fetchUserProfileSettings(getToken);
         if (cancelled) return;
@@ -111,8 +108,6 @@ export default function Configuracao() {
           setBio(local.bio);
           setLogoDataUrl(getSystemBranding().logoDataUrl);
         }
-      } finally {
-        if (!cancelled) setIsLoadingSettings(false);
       }
     })();
 
@@ -209,7 +204,7 @@ export default function Configuracao() {
         </div>
         <Button type="submit" disabled={isSaving}>
           <Save className="h-4 w-4" />
-          {isSaving ? "Salvando..." : isLoadingSettings ? "Salvar alterações" : "Salvar alterações"}
+          {isSaving ? "Salvando..." : "Salvar alterações"}
         </Button>
       </div>
 
