@@ -32,7 +32,18 @@ async function authorizedRequest(path: string, getToken: () => Promise<string | 
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${token}`);
 
-  return fetch(`/api/${path}`, { ...init, headers });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 10000);
+
+  try {
+    return await fetch(`/api/${path}`, {
+      ...init,
+      headers,
+      signal: init.signal ?? controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 function parseProfile(data: Partial<UserProfileSettings> | null | undefined): UserProfileSettings {

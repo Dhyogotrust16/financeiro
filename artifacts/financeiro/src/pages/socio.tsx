@@ -313,7 +313,7 @@ export default function Socio() {
                 </div>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
-                <Button type="submit" className="flex-1" disabled={isLoadingPartners || isSavingPartners}>
+                <Button type="submit" className="flex-1" disabled={isSavingPartners}>
                   {editingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
                   {isSavingPartners ? "Salvando..." : editingId ? "Salvar sócio" : "Cadastrar sócio"}
                 </Button>

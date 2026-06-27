@@ -207,9 +207,9 @@ export default function Configuracao() {
             Atualize os dados do seu perfil e a identidade visual exibida no sistema.
           </p>
         </div>
-        <Button type="submit" disabled={isSaving || isLoadingSettings}>
+        <Button type="submit" disabled={isSaving}>
           <Save className="h-4 w-4" />
-          {isSaving ? "Salvando..." : isLoadingSettings ? "Carregando..." : "Salvar alterações"}
+          {isSaving ? "Salvando..." : isLoadingSettings ? "Salvar alterações" : "Salvar alterações"}
         </Button>
       </div>
 
