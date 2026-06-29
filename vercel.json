@@ -14,7 +14,7 @@
   },
   "routes": [
     { "handle": "filesystem" },
-    { "source": "/api/:path*", "destination": "/api/:path*" },
+    { "source": "/api/:path*", "destination": "/api/[...path].js" },
     { "source": "/:path*", "destination": "/index.html" }
   ]
 }
