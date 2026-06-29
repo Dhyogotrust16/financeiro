@@ -13,6 +13,7 @@ export interface PartnerSettings {
   name: string;
   email: string;
   percentage: number;
+  responsavelLegal: boolean;
 }
 
 export const EMPTY_PROFILE_SETTINGS: UserProfileSettings = {
@@ -82,6 +83,7 @@ function parsePartners(data: unknown): PartnerSettings[] {
         name: String(partner.name ?? ""),
         email: String(partner.email ?? ""),
         percentage: Number(partner.percentage ?? 0),
+        responsavelLegal: partner.responsavelLegal === true || partner.responsavelLegal === "true",
       };
     })
     .filter((partner) => partner.id && partner.name && Number.isFinite(partner.percentage));

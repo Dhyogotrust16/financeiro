@@ -4,6 +4,7 @@ import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis
 import { BadgePercent, Handshake, Mail, Pencil, PieChart, Plus, Save, Trash2, UserRound, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,6 +18,7 @@ interface Partner {
   name: string;
   email: string;
   percentage: number;
+  responsavelLegal: boolean;
 }
 
 const STORAGE_KEY = "financeiro-partners";
@@ -59,6 +61,7 @@ export default function Socio() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [percentage, setPercentage] = useState("");
+  const [responsavelLegal, setResponsavelLegal] = useState(false);
 
   const netProfit = Number(summary?.balance ?? 0);
   const totalPercentage = partners.reduce((sum, partner) => sum + partner.percentage, 0);
@@ -131,6 +134,7 @@ export default function Socio() {
     setName("");
     setEmail("");
     setPercentage("");
+    setResponsavelLegal(false);
   }
 
   async function persist(nextPartners: Partner[]) {
@@ -186,7 +190,7 @@ export default function Socio() {
     const nextPartners = editingId
       ? partners.map((partner) =>
           partner.id === editingId
-            ? { ...partner, name: trimmedName, email: trimmedEmail, percentage: parsedPercentage }
+            ? { ...partner, name: trimmedName, email: trimmedEmail, percentage: parsedPercentage, responsavelLegal }
             : partner,
         )
       : [
@@ -196,6 +200,7 @@ export default function Socio() {
             name: trimmedName,
             email: trimmedEmail,
             percentage: parsedPercentage,
+            responsavelLegal,
           },
         ];
 
@@ -211,6 +216,7 @@ export default function Socio() {
     setName(partner.name);
     setEmail(partner.email);
     setPercentage(String(partner.percentage).replace(".", ","));
+    setResponsavelLegal(partner.responsavelLegal);
   }
 
   async function handleDelete(partnerId: string) {
@@ -312,6 +318,16 @@ export default function Socio() {
                   />
                 </div>
               </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="partner-responsavel-legal"
+                  checked={responsavelLegal}
+                  onCheckedChange={(checked) => setResponsavelLegal(checked === true)}
+                />
+                <Label htmlFor="partner-responsavel-legal" className="mb-0">
+                  Responsável legal
+                </Label>
+              </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button type="submit" className="flex-1" disabled={isSavingPartners}>
                   {editingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -408,6 +424,7 @@ export default function Socio() {
                   <TableHead>E-mail</TableHead>
                   <TableHead className="text-right">Percentual</TableHead>
                   <TableHead className="text-right">Valor estimado</TableHead>
+                  <TableHead className="text-right">Resp. legal</TableHead>
                   <TableHead className="w-[110px] text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -419,6 +436,7 @@ export default function Socio() {
                       <TableCell className="text-muted-foreground">{partner.email || "-"}</TableCell>
                       <TableCell className="text-right">{partner.percentage.toFixed(2).replace(".", ",")}%</TableCell>
                       <TableCell className="text-right">{formatCurrency(partner.amount)}</TableCell>
+                      <TableCell className="text-right">{partner.responsavelLegal ? "Sim" : "Não"}</TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
                           <Button type="button" variant="ghost" size="icon" onClick={() => handleEdit(partner)}>
@@ -433,7 +451,7 @@ export default function Socio() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                       Nenhum sócio cadastrado.
                     </TableCell>
                   </TableRow>

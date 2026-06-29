@@ -12,6 +12,7 @@ interface PartnerRow {
   name: string;
   email?: string | null;
   percentage: string | number;
+  responsavel_legal?: boolean | null;
 }
 
 interface PartnerInput {
@@ -19,6 +20,7 @@ interface PartnerInput {
   name?: unknown;
   email?: unknown;
   percentage?: unknown;
+  responsavelLegal?: unknown;
 }
 
 let ensurePartnersTablePromise: Promise<void> | null = null;
@@ -33,10 +35,16 @@ async function ensurePartnersTable() {
           name TEXT NOT NULL,
           email TEXT,
           percentage NUMERIC(5, 2) NOT NULL,
+          responsavel_legal BOOLEAN NOT NULL DEFAULT FALSE,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `)
+      .then(() =>
+        db.execute(sqlQuery`
+          ALTER TABLE partners ADD COLUMN IF NOT EXISTS responsavel_legal BOOLEAN NOT NULL DEFAULT FALSE
+        `),
+      )
       .then(() =>
         db.execute(sqlQuery`
           CREATE INDEX IF NOT EXISTS idx_partners_user_id ON partners(user_id)
@@ -58,6 +66,7 @@ function serializePartner(row: PartnerRow) {
     name: row.name,
     email: row.email ?? "",
     percentage: Number(row.percentage),
+    responsavelLegal: row.responsavel_legal === true,
   };
 }
 
@@ -70,8 +79,10 @@ function normalizePartner(input: PartnerInput) {
       : Number(input.percentage);
   const percentage = Number.isFinite(rawPercentage) ? Math.max(0, Math.min(rawPercentage, 100)) : 0;
   const id = typeof input.id === "string" && input.id.trim() ? input.id.trim() : randomUUID();
+  const responsavelLegal =
+    input.responsavelLegal === true || input.responsavelLegal === "true";
 
-  return { id, name, email, percentage };
+  return { id, name, email, percentage, responsavelLegal };
 }
 
 router.get("/", requireAuth, async (req, res) => {
@@ -79,7 +90,7 @@ router.get("/", requireAuth, async (req, res) => {
   await ensurePartnersTable();
 
   const rows = (await db.execute(sqlQuery`
-    SELECT id, name, email, percentage
+    SELECT id, name, email, percentage, responsavel_legal
     FROM partners
     WHERE user_id = ${userId}
     ORDER BY created_at ASC
@@ -116,14 +127,14 @@ router.put("/", requireAuth, async (req, res) => {
 
     for (const partner of partners) {
       await tx.execute(sqlQuery`
-        INSERT INTO partners (id, user_id, name, email, percentage, created_at, updated_at)
-        VALUES (${partner.id}, ${userId}, ${partner.name}, ${partner.email}, ${partner.percentage}, NOW(), NOW())
+        INSERT INTO partners (id, user_id, name, email, percentage, responsavel_legal, created_at, updated_at)
+        VALUES (${partner.id}, ${userId}, ${partner.name}, ${partner.email}, ${partner.percentage}, ${partner.responsavelLegal}, NOW(), NOW())
       `);
     }
   });
 
   const rows = (await db.execute(sqlQuery`
-    SELECT id, name, email, percentage
+    SELECT id, name, email, percentage, responsavel_legal
     FROM partners
     WHERE user_id = ${userId}
     ORDER BY created_at ASC
