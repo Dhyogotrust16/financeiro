@@ -21,25 +21,7 @@ interface Partner {
   responsavelLegal: boolean;
 }
 
-const STORAGE_KEY = "financeiro-partners";
 const CHART_COLORS = ["#0ea5e9", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6"];
-
-function readPartners(): Partner[] {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Partner[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function savePartners(partners: Partner[]) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(partners));
-}
 
 function clampPercentage(value: number) {
   if (!Number.isFinite(value)) return 0;
@@ -54,7 +36,7 @@ export default function Socio() {
   const currentMonth = date.getMonth() + 1;
   const { data: summary, isLoading } = useGetDashboardSummary(currentYear, currentMonth);
 
-  const [partners, setPartners] = useState<Partner[]>(() => readPartners());
+  const [partners, setPartners] = useState<Partner[]>([]);
   const [isLoadingPartners, setIsLoadingPartners] = useState(true);
   const [isSavingPartners, setIsSavingPartners] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -100,22 +82,12 @@ export default function Socio() {
         const remote = await fetchPartners(getToken);
         if (cancelled) return;
 
-        if (remote.length === 0 && partners.length > 0) {
-          const migrated = await savePartnersRemote(partners, getToken);
-          if (!cancelled) {
-            setPartners(migrated);
-            savePartners(migrated);
-          }
-          return;
-        }
-
         setPartners(remote);
-        savePartners(remote);
       } catch {
         if (!cancelled) {
           toast({
             title: "Nao foi possivel carregar os socios",
-            description: "Usando dados salvos neste navegador temporariamente.",
+            description: "Tente novamente em instantes.",
             variant: "destructive",
           });
         }
@@ -143,7 +115,6 @@ export default function Socio() {
     try {
       const saved = await savePartnersRemote(nextPartners, getToken);
       setPartners(saved);
-      savePartners(saved);
       return true;
     } catch (error) {
       toast({
@@ -187,22 +158,29 @@ export default function Socio() {
       return;
     }
 
-    const nextPartners = editingId
-      ? partners.map((partner) =>
-          partner.id === editingId
-            ? { ...partner, name: trimmedName, email: trimmedEmail, percentage: parsedPercentage, responsavelLegal }
-            : partner,
-        )
-      : [
-          ...partners,
-          {
-            id: crypto.randomUUID(),
-            name: trimmedName,
-            email: trimmedEmail,
-            percentage: parsedPercentage,
-            responsavelLegal,
-          },
-        ];
+    let nextPartners: Partner[];
+
+    if (editingId) {
+      nextPartners = partners.map((partner) =>
+        partner.id === editingId
+          ? { ...partner, name: trimmedName, email: trimmedEmail, percentage: parsedPercentage, responsavelLegal }
+          : responsavelLegal
+          ? { ...partner, responsavelLegal: false }
+          : partner,
+      );
+    } else {
+      const newPartner: Partner = {
+        id: crypto.randomUUID(),
+        name: trimmedName,
+        email: trimmedEmail,
+        percentage: parsedPercentage,
+        responsavelLegal,
+      };
+
+      nextPartners = responsavelLegal
+        ? partners.map((p) => ({ ...p, responsavelLegal: false })).concat(newPartner)
+        : [...partners, newPartner];
+    }
 
     const saved = await persist(nextPartners);
     if (saved) {

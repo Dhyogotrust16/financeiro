@@ -102,6 +102,10 @@ export async function saveUserProfileSettings(
   settings: UserProfileSettings,
   getToken: () => Promise<string | null>,
 ) {
+  // Avoid sending very large data URLs which can exceed server body limits
+  if (settings.logoDataUrl && settings.logoDataUrl.length > 4.5 * 1024 * 1024) {
+    throw new Error("Imagem muito grande. Reduza a resolução ou o tamanho da imagem e tente novamente.");
+  }
   const response = await authorizedRequest("settings/profile", getToken, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { logger } from "../lib/logger";
 
 const router = Router();
 const sqlQuery = sql as any;
@@ -80,31 +81,36 @@ router.put("/profile", requireAuth, async (req, res) => {
   const body = req.body as Record<string, unknown>;
   const logoDataUrl = normalizeLogo(body.logoDataUrl);
 
-  await ensureSettingsTable();
+  try {
+    await ensureSettingsTable();
 
-  const rows = (await db.execute(sqlQuery`
-    INSERT INTO user_settings (user_id, phone, role, company, bio, logo_data_url, created_at, updated_at)
-    VALUES (
-      ${userId},
-      ${normalizeText(body.phone)},
-      ${normalizeText(body.role)},
-      ${normalizeText(body.company)},
-      ${normalizeText(body.bio)},
-      ${logoDataUrl},
-      NOW(),
-      NOW()
-    )
-    ON CONFLICT (user_id) DO UPDATE
-    SET phone = EXCLUDED.phone,
-        role = EXCLUDED.role,
-        company = EXCLUDED.company,
-        bio = EXCLUDED.bio,
-        logo_data_url = EXCLUDED.logo_data_url,
-        updated_at = NOW()
-    RETURNING phone, role, company, bio, logo_data_url
-  `)) as UserSettingsRow[];
+    const rows = (await db.execute(sqlQuery`
+      INSERT INTO user_settings (user_id, phone, role, company, bio, logo_data_url, created_at, updated_at)
+      VALUES (
+        ${userId},
+        ${normalizeText(body.phone)},
+        ${normalizeText(body.role)},
+        ${normalizeText(body.company)},
+        ${normalizeText(body.bio)},
+        ${logoDataUrl},
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT (user_id) DO UPDATE
+      SET phone = EXCLUDED.phone,
+          role = EXCLUDED.role,
+          company = EXCLUDED.company,
+          bio = EXCLUDED.bio,
+          logo_data_url = EXCLUDED.logo_data_url,
+          updated_at = NOW()
+      RETURNING phone, role, company, bio, logo_data_url
+    `)) as UserSettingsRow[];
 
-  res.json(serializeSettings(rows[0]));
+    res.json(serializeSettings(rows[0]));
+  } catch (err: any) {
+    logger.error({ err, userId, contentLength: req.headers["content-length"] }, "Failed to save user profile");
+    res.status(500).json({ error: String(err?.message ?? err) });
+  }
 });
 
 export default router;

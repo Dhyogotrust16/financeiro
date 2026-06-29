@@ -103,6 +103,11 @@ router.put("/", requireAuth, async (req, res) => {
   const userId = (req as any).userId as string;
   const body = req.body as { partners?: PartnerInput[] };
   const partners = Array.isArray(body.partners) ? body.partners.map(normalizePartner) : [];
+  const legalCount = partners.filter((p) => p.responsavelLegal === true).length;
+  if (legalCount > 1) {
+    res.status(400).json({ error: "Apenas um sócio pode ser marcado como responsável legal." });
+    return;
+  }
   const totalPercentage = partners.reduce((sum, partner) => sum + partner.percentage, 0);
 
   if (partners.some((partner) => !partner.name)) {

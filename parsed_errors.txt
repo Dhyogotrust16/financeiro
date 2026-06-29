@@ -1,0 +1,99 @@
+Error: Failed query: 
+        INSERT INTO partners (id, user_id, name, email, percentage, responsavel_legal, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      
+params: 2867e47c-06b3-477b-8575-261c3f6d09a6,08fe66b3-287a-466a-be66-1b934afa27f4,Digoooo,digoo@gmail.com,20,false
+    at PostgresJsPreparedQuery.queryWithCache (file:///var/task/artifacts/api-server/dist/vercel.mjs:54693:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77795:7
+    at async scope (file:///var/task/artifacts/api-server/dist/vercel.mjs:47920:18)
+    at async sql3.begin (file:///var/task/artifacts/api-server/dist/vercel.mjs:47906:14)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77792:3---
+Error: Failed query: 
+        INSERT INTO partners (id, user_id, name, email, percentage, responsavel_legal, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      
+params: 2867e47c-06b3-477b-8575-261c3f6d09a6,08fe66b3-287a-466a-be66-1b934afa27f4,Digoooo,digoo@gmail.com,20,false
+    at PostgresJsPreparedQuery.queryWithCache (file:///var/task/artifacts/api-server/dist/vercel.mjs:54693:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77795:7
+    at async scope (file:///var/task/artifacts/api-server/dist/vercel.mjs:47920:18)
+    at async sql3.begin (file:///var/task/artifacts/api-server/dist/vercel.mjs:47906:14)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77792:3---
+Error: Failed query: 
+        INSERT INTO partners (id, user_id, name, email, percentage, responsavel_legal, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      
+params: 2867e47c-06b3-477b-8575-261c3f6d09a6,08fe66b3-287a-466a-be66-1b934afa27f4,Digoooo,digoo@gmail.com,20,false
+    at PostgresJsPreparedQuery.queryWithCache (file:///var/task/artifacts/api-server/dist/vercel.mjs:54693:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77795:7
+    at async scope (file:///var/task/artifacts/api-server/dist/vercel.mjs:47920:18)
+    at async sql3.begin (file:///var/task/artifacts/api-server/dist/vercel.mjs:47906:14)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77792:3---
+Error: Failed query: 
+        INSERT INTO partners (id, user_id, name, email, percentage, responsavel_legal, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      
+params: 2867e47c-06b3-477b-8575-261c3f6d09a6,08fe66b3-287a-466a-be66-1b934afa27f4,Digoooo,digoo@gmail.com,20,false
+    at PostgresJsPreparedQuery.queryWithCache (file:///var/task/artifacts/api-server/dist/vercel.mjs:54693:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77795:7
+    at async scope (file:///var/task/artifacts/api-server/dist/vercel.mjs:47920:18)
+    at async sql3.begin (file:///var/task/artifacts/api-server/dist/vercel.mjs:47906:14)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77792:3---
+Error: Failed query: 
+        INSERT INTO partners (id, user_id, name, email, percentage, responsavel_legal, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      
+params: 2867e47c-06b3-477b-8575-261c3f6d09a6,08fe66b3-287a-466a-be66-1b934afa27f4,Digoooo,digoo@gmail.com,20,false
+    at PostgresJsPreparedQuery.queryWithCache (file:///var/task/artifacts/api-server/dist/vercel.mjs:54693:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77795:7
+    at async scope (file:///var/task/artifacts/api-server/dist/vercel.mjs:47920:18)
+    at async sql3.begin (file:///var/task/artifacts/api-server/dist/vercel.mjs:47906:14)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77792:3---
+Error: Failed query: 
+        INSERT INTO partners (id, user_id, name, email, percentage, responsavel_legal, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      
+params: 2867e47c-06b3-477b-8575-261c3f6d09a6,08fe66b3-287a-466a-be66-1b934afa27f4,Digoooo,digoo@gmail.com,20,false
+    at PostgresJsPreparedQuery.queryWithCache (file:///var/task/artifacts/api-server/dist/vercel.mjs:54693:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77795:7
+    at async scope (file:///var/task/artifacts/api-server/dist/vercel.mjs:47920:18)
+    at async sql3.begin (file:///var/task/artifacts/api-server/dist/vercel.mjs:47906:14)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77792:3---
+Error: Failed query: 
+        INSERT INTO partners (id, user_id, name, email, percentage, responsavel_legal, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      
+params: 2867e47c-06b3-477b-8575-261c3f6d09a6,08fe66b3-287a-466a-be66-1b934afa27f4,Digoooo,digoo@gmail.com,20,false
+    at PostgresJsPreparedQuery.queryWithCache (file:///var/task/artifacts/api-server/dist/vercel.mjs:54693:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77795:7
+    at async scope (file:///var/task/artifacts/api-server/dist/vercel.mjs:47920:18)
+    at async sql3.begin (file:///var/task/artifacts/api-server/dist/vercel.mjs:47906:14)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77792:3---
+Error: Failed query: 
+        INSERT INTO partners (id, user_id, name, email, percentage, responsavel_legal, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      
+params: 2867e47c-06b3-477b-8575-261c3f6d09a6,08fe66b3-287a-466a-be66-1b934afa27f4,Digoooo,digoo@gmail.com,20,false
+    at PostgresJsPreparedQuery.queryWithCache (file:///var/task/artifacts/api-server/dist/vercel.mjs:54693:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77795:7
+    at async scope (file:///var/task/artifacts/api-server/dist/vercel.mjs:47920:18)
+    at async sql3.begin (file:///var/task/artifacts/api-server/dist/vercel.mjs:47906:14)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77792:3---
+Error: Failed query: 
+        INSERT INTO partners (id, user_id, name, email, percentage, responsavel_legal, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      
+params: 2867e47c-06b3-477b-8575-261c3f6d09a6,08fe66b3-287a-466a-be66-1b934afa27f4,Digoooo,digoo@gmail.com,20,false
+    at PostgresJsPreparedQuery.queryWithCache (file:///var/task/artifacts/api-server/dist/vercel.mjs:54693:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77795:7
+    at async scope (file:///var/task/artifacts/api-server/dist/vercel.mjs:47920:18)
+    at async sql3.begin (file:///var/task/artifacts/api-server/dist/vercel.mjs:47906:14)
+    at async file:///var/task/artifacts/api-server/dist/vercel.mjs:77792:3
