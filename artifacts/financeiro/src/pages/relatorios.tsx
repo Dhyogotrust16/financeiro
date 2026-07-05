@@ -95,7 +95,6 @@ function exportProfitabilityCsv(rows: ProfitabilityRow[]) {
   const csv = [header, ...body].map((line) => line.map(csvCell).join(";")).join("\n");
   downloadBlob("lucratividade-clientes.csv", `\uFEFF${csv}`, "text/csv;charset=utf-8");
 }
-}
 
 function exportCashflowCsv(rows: any[]) {
   const header = ["Periodo", "Receitas", "Despesas", "Saldo"];
