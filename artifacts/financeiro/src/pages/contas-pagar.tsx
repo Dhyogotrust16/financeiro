@@ -191,6 +191,7 @@ export default function ContasPagar() {
     year: now.getFullYear(),
   });
   const [statusFilter, setStatusFilter] = useState<"pendente" | "pago" | "">("pendente");
+  const [search, setSearch] = useState<string>("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [payingId, setPayingId] = useState<number | null>(null);
@@ -288,10 +289,24 @@ export default function ContasPagar() {
   }
 
   const payingBill = payables?.find((p) => p.id === payingId);
+  const enriched = (payables ?? []).map((p) => ({
+    ...p,
+    displayStatus: p.status === "pendente" && p.dueDate < today ? "atrasado" : p.status,
+  }));
 
-  const totalPendente = payables?.filter(p => p.status === "pendente").reduce((s, p) => s + p.amount, 0) ?? 0;
-  const totalPago = payables?.filter(p => p.status === "pago").reduce((s, p) => s + p.amount, 0) ?? 0;
-  const countPendente = payables?.filter(p => p.status === "pendente").length ?? 0;
+  const visible = search.trim()
+    ? enriched.filter((p) => {
+        const q = search.trim().toLowerCase();
+        return (
+          (p.description ?? "").toLowerCase().includes(q) ||
+          (p.categoryName ?? "").toLowerCase().includes(q)
+        );
+      })
+    : enriched;
+
+  const totalPendente = visible.filter(p => p.displayStatus === "pendente" || p.displayStatus === "atrasado").reduce((s, p) => s + p.amount, 0) ?? 0;
+  const totalPago = visible.filter(p => p.displayStatus === "pago").reduce((s, p) => s + p.amount, 0) ?? 0;
+  const countPendente = visible.filter(p => p.displayStatus === "pendente" || p.displayStatus === "atrasado").length ?? 0;
 
 
   return (
@@ -309,6 +324,12 @@ export default function ContasPagar() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <PeriodFilter value={period} onChange={setPeriod} />
+        <Input
+          placeholder="Buscar por descrição ou categoria"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
         <div className="flex rounded-lg border bg-background text-sm overflow-hidden">
           {(["", "pendente", "pago"] as const).map((s) => (
             <button
@@ -451,7 +472,7 @@ export default function ContasPagar() {
                         ))}
                       </TableRow>
                     ))
-                  ) : !payables?.length ? (
+                  ) : !visible.length ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
                         <div className="flex flex-col items-center gap-2">
@@ -461,7 +482,7 @@ export default function ContasPagar() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    (Array.isArray(payables) ? payables : []).map((payable) => {
+                    visible.map((payable) => {
                       const isOverdue = payable.status === "pendente" && payable.dueDate < today;
                       const editDefaults: PayableForm = {
                         description: payable.description,
