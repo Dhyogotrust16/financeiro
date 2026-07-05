@@ -142,9 +142,25 @@ export default function Honorarios() {
   const selectedBalance = selectedHonorario ? Math.max(0, selectedHonorario.amount - paidTotal(selectedHonorario)) : 0;
   const selectedClientForForm = clients?.find((client) => client.id === Number(clientId));
   const filteredClients = useMemo(() => {
-    const term = clientSearch.trim().toLowerCase();
+    const termRaw = clientSearch.trim();
+    const term = termRaw.toLowerCase();
+    if (!term) return [];
+
+    function initialsFor(name: string) {
+      return name
+        .split(/\s+/)
+        .map((w) => w[0] ?? "")
+        .join("")
+        .toLowerCase();
+    }
+
     return (clients ?? [])
-      .filter((client) => !term || client.name.toLowerCase().includes(term))
+      .filter((client) => {
+        const initials = initialsFor(client.name);
+        // match when typed value equals the initials prefix, or when user types same letters ignoring spaces
+        const compact = termRaw.replace(/\s+/g, "").toLowerCase();
+        return initials.startsWith(compact);
+      })
       .slice(0, 6);
   }, [clientSearch, clients]);
 
