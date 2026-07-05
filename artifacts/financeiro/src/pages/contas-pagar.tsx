@@ -60,7 +60,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Pencil, ArrowUpCircle, Receipt, Clock, CheckCircle2, Banknote } from "lucide-react";
+import { Plus, Trash2, Pencil, ArrowUpCircle, Receipt, Clock, CheckCircle2, Banknote, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { PeriodFilter, periodToDates, type PeriodValue } from "@/components/period-filter";
@@ -324,12 +324,15 @@ export default function ContasPagar() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <PeriodFilter value={period} onChange={setPeriod} />
-        <Input
-          placeholder="Buscar por descrição ou categoria"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
+        <div className="flex items-center space-x-2">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por descrição ou categoria"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-xs"
+          />
+        </div>
         <div className="flex rounded-lg border bg-background text-sm overflow-hidden">
           {(["", "pendente", "pago"] as const).map((s) => (
             <button

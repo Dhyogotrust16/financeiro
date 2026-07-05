@@ -49,7 +49,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Clock, Banknote, Receipt, Plus } from "lucide-react";
+import { CheckCircle2, Clock, Banknote, Receipt, Plus, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
@@ -204,12 +204,15 @@ export default function ContasReceber() {
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-3">
         <PeriodFilter value={period} onChange={setPeriod} />
-        <Input
-          placeholder="Buscar por cliente, descrição ou categoria"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
+        <div className="flex items-center space-x-2">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por cliente, descrição ou categoria"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-xs"
+          />
+        </div>
         <div className="flex rounded-lg border bg-background text-sm overflow-hidden">
           {(["", "pendente", "pago"] as const).map((s) => (
             <button
