@@ -1,5 +1,5 @@
-import { useGetClientProfitability, useGetDashboardCashflow } from "@workspace/api-client-react";
-import { useMemo } from "react";
+import { useGetClientProfitability, useGetDashboardCashflow, useListExpenses, useListRevenues } from "@workspace/api-client-react";
+import { useMemo, useState } from "react";
 import { Download, FileText, Printer, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,34 +65,30 @@ function downloadBlob(fileName: string, content: string, type: string) {
   a.download = fileName;
   a.click();
   URL.revokeObjectURL(url);
-}
+            <CardTitle>Despesas por Categoria (mês)</CardTitle>
 
-function exportProfitabilityCsv(rows: ProfitabilityRow[]) {
-  const header = [
-    "Cliente",
-    "Faturado",
-    "Recebido",
-    "Pendente",
-    "Despesas",
-    "Lucro liquido",
-    "Margem",
-    "Cobrancas",
-    "Receitas",
-    "Despesas lancadas",
-  ];
-  const body = rows.map((row) => [
-    row.clientName,
-    row.totalBilled,
-    row.totalPaid,
-    row.pendingAmount,
-    row.totalExpenses ?? 0,
-    row.netProfit ?? row.totalPaid - (row.totalExpenses ?? 0),
-    percent(row.margin),
-    row.billingCount,
-    row.revenueCount ?? 0,
-    row.expenseCount ?? 0,
-  ]);
-  const csv = [header, ...body].map((line) => line.map(csvCell).join(";")).join("\n");
+          <CardContent className="p-0 overflow-x-auto">
+            <Table className="min-w-[460px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {expensesByCategory.length ? (
+                  expensesByCategory.map((r) => (
+                    <TableRow key={r.category}>
+                      <TableCell className="font-medium">{r.category}</TableCell>
+                      <TableCell className="text-right text-red-600">{formatCurrency(r.amount)}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow><TableCell colSpan={2} className="h-24 text-center text-muted-foreground">Nenhum dado encontrado.</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
   downloadBlob("lucratividade-clientes.csv", `\uFEFF${csv}`, "text/csv;charset=utf-8");
 }
 
@@ -173,6 +169,10 @@ export default function Relatorios() {
   const { data: cashflow, isLoading: isLoadingCashflow } = useGetDashboardCashflow({
     query: { staleTime: 0, refetchOnMount: "always" } as any,
   });
+  const { data: expenses } = useListExpenses();
+  const { data: revenues } = useListRevenues();
+
+  const [reportPeriod, setReportPeriod] = useState<{ year: number; month: number } | null>(null);
 
   const storedHonorarios = useMemo(() => readStoredHonorarios(), []);
   const profitabilityRows = useMemo(() => {
@@ -224,6 +224,33 @@ export default function Relatorios() {
   const totalProfit = profitabilityRows.reduce((sum, row) => sum + Number(row.netProfit ?? row.totalPaid - (row.totalExpenses ?? 0)), 0);
   const totalPending = profitabilityRows.reduce((sum, row) => sum + row.pendingAmount, 0);
 
+  // Combined list of revenues and expenses sorted by date
+  const combined = useMemo(() => {
+    const items: any[] = [];
+    (Array.isArray(revenues) ? revenues : []).forEach((r) => items.push({ type: "revenue", date: r.date, description: r.description, amount: r.amount, id: `r-${r.id}` }));
+    (Array.isArray(expenses) ? expenses : []).forEach((e) => items.push({ type: "expense", date: e.date, description: e.description, amount: e.amount, id: `e-${e.id}` }));
+    return items.sort((a, b) => b.date.localeCompare(a.date));
+  }, [revenues, expenses]);
+
+  // Expenses by category for the selected period (defaults to current month)
+  const expensesByCategory = useMemo(() => {
+    const now = new Date();
+    const year = reportPeriod?.year ?? now.getFullYear();
+    const month = reportPeriod?.month ?? now.getMonth() + 1;
+    const start = `${year}-${String(month).padStart(2, "0")}-01`;
+    const end = new Date(year, month, 0).toISOString().split("T")[0];
+    const rows = new Map<string, number>();
+    (Array.isArray(expenses) ? expenses : []).forEach((e) => {
+      if (e.date >= start && e.date <= end) {
+        const key = e.categoryName ?? "Geral";
+        rows.set(key, (rows.get(key) ?? 0) + e.amount);
+      }
+    });
+    return Array.from(rows.entries()).map(([category, amount]) => ({ category, amount }));
+  }, [expenses, reportPeriod]);
+
+  const totalRepasses = (Array.isArray(expenses) ? expenses : []).filter(e => e.passToClient).reduce((s, e) => s + e.amount, 0);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -247,6 +274,56 @@ export default function Relatorios() {
         </div>
       </div>
 
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Honorários Pendentes</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead className="text-right">Pendente</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {profitabilityRows.filter(r => r.pendingAmount > 0).map((r) => (
+                  <TableRow key={r.clientId}>
+                    <TableCell>{r.clientName}</TableCell>
+                    <TableCell className="text-right text-amber-600">{formatCurrency(r.pendingAmount)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Honorários Recebidos</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead className="text-right">Recebido</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {profitabilityRows.filter(r => (r.totalPaid ?? 0) > 0).map((r) => (
+                  <TableRow key={r.clientId}>
+                    <TableCell>{r.clientName}</TableCell>
+                    <TableCell className="text-right text-green-600">{formatCurrency(r.totalPaid ?? 0)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Recebido por clientes</CardTitle></CardHeader>
@@ -254,7 +331,10 @@ export default function Relatorios() {
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Despesas vinculadas</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</div></CardContent>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</div>
+            <div className="text-xs text-muted-foreground mt-1">Repasses: {formatCurrency(totalRepasses)}</div>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Lucro líquido</CardTitle></CardHeader>
@@ -316,34 +396,29 @@ export default function Relatorios() {
             </Table>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader>
-            <CardTitle>Histórico de Fluxo de Caixa</CardTitle>
+            <CardTitle>Receitas & Despesas (cronológico)</CardTitle>
           </CardHeader>
           <CardContent className="p-0 overflow-x-auto">
             <Table className="min-w-[460px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Período</TableHead>
-                  <TableHead className="text-right">Receitas</TableHead>
-                  <TableHead className="text-right">Despesas</TableHead>
-                  <TableHead className="text-right">Saldo</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoadingCashflow ? (
-                  <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
-                ) : (
-                  cashflowRows.map((row, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{row.label}</TableCell>
-                      <TableCell className="text-right text-green-600">{formatCurrency(row.revenue)}</TableCell>
-                      <TableCell className="text-right text-red-600">{formatCurrency(row.expenses)}</TableCell>
-                      <TableCell className="text-right font-bold">{formatCurrency(row.balance)}</TableCell>
-                    </TableRow>
-                  ))
-                )}
+                {combined.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="font-medium">{row.date}</TableCell>
+                    <TableCell className="text-muted-foreground">{row.type === 'revenue' ? 'Receita' : 'Despesa'}</TableCell>
+                    <TableCell>{row.description}</TableCell>
+                    <TableCell className={`text-right ${row.type === 'revenue' ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(row.amount)}</TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </CardContent>

@@ -249,8 +249,9 @@ export default function Despesas() {
 
   const today = new Date().toISOString().split("T")[0];
 
-  const totalDespesas = (Array.isArray(expenses) ? expenses : []).reduce((s, e) => s + e.amount, 0);
-  const totalRepasse = (Array.isArray(expenses) ? expenses : []).filter(e => e.passToClient).reduce((s, e) => s + e.amount, 0);
+  const sortedExpenses = (Array.isArray(expenses) ? expenses : []).slice().sort((a, b) => b.date.localeCompare(a.date));
+  const totalDespesas = sortedExpenses.reduce((s, e) => s + e.amount, 0);
+  const totalRepasse = sortedExpenses.filter(e => e.passToClient).reduce((s, e) => s + e.amount, 0);
 
   const createDefaults: ExpenseForm = {
     date: today,
@@ -320,8 +321,8 @@ export default function Despesas() {
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <PeriodFilter value={period} onChange={setPeriod} />
-        {!isLoading && !!expenses?.length && (
-          <div className="flex items-center gap-4 text-sm">
+        {!isLoading && !!sortedExpenses?.length && (
+            <div className="flex items-center gap-4 text-sm">
             <span className="text-muted-foreground">
               Total: <span className="font-semibold text-red-600 dark:text-red-400">{formatCurrency(totalDespesas)}</span>
             </span>
@@ -365,14 +366,14 @@ export default function Despesas() {
                     ))}
                   </TableRow>
                 ))
-              ) : !expenses?.length ? (
+              ) : !sortedExpenses?.length ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     Nenhuma despesa encontrada. Clique em "Nova Despesa" para começar.
                   </TableCell>
                 </TableRow>
               ) : (
-                (Array.isArray(expenses) ? expenses : []).map((expense) => {
+                sortedExpenses.map((expense) => {
                   const editDefaults: ExpenseForm = {
                     date: expense.date,
                     description: expense.description,

@@ -253,8 +253,9 @@ export default function Receitas() {
 
   const today = new Date().toISOString().split("T")[0];
 
-  const totalRecebido = (Array.isArray(revenues) ? revenues : []).filter(r => r.status === "recebido").reduce((s, r) => s + r.amount, 0);
-  const totalPendente = (Array.isArray(revenues) ? revenues : []).filter(r => r.status === "pendente").reduce((s, r) => s + r.amount, 0);
+  const sortedRevenues = (Array.isArray(revenues) ? revenues : []).slice().sort((a, b) => b.date.localeCompare(a.date));
+  const totalRecebido = sortedRevenues.filter(r => r.status === "recebido").reduce((s, r) => s + r.amount, 0);
+  const totalPendente = sortedRevenues.filter(r => r.status === "pendente").reduce((s, r) => s + r.amount, 0);
 
   const createDefaults: RevenueForm = {
     date: today,
@@ -343,7 +344,7 @@ export default function Receitas() {
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <PeriodFilter value={period} onChange={setPeriod} />
-        {!isLoading && !!revenues?.length && (
+        {!isLoading && !!sortedRevenues?.length && (
           <div className="flex items-center gap-4 text-sm">
             <span className="text-muted-foreground">
               Recebido: <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(totalRecebido)}</span>
@@ -387,14 +388,14 @@ export default function Receitas() {
                     ))}
                   </TableRow>
                 ))
-              ) : !revenues?.length ? (
+              ) : !sortedRevenues?.length ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     Nenhuma receita encontrada. Clique em "Nova Receita" para começar.
                   </TableCell>
                 </TableRow>
               ) : (
-                (Array.isArray(revenues) ? revenues : []).map((revenue) => {
+                sortedRevenues.map((revenue) => {
                   const editDefaults: RevenueForm = {
                     date: revenue.date,
                     description: revenue.description,
