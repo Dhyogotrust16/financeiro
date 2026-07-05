@@ -94,6 +94,7 @@ export default function ContasReceber() {
     year: now.getFullYear(),
   });
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("pendente");
+  const [search, setSearch] = useState<string>("");
 
   const periodParams = period ? periodToDates(period) : {};
   const queryParams = {
@@ -165,17 +166,27 @@ export default function ContasReceber() {
     ...b,
     displayStatus: b.status === "pendente" && b.dueDate < today ? "atrasado" : b.status,
   }));
+  const visible = search.trim()
+    ? enriched.filter((b) => {
+        const q = search.trim().toLowerCase();
+        return (
+          (b.description ?? "").toLowerCase().includes(q) ||
+          (b.clientName ?? "").toLowerCase().includes(q) ||
+          (b.categoryName ?? "").toLowerCase().includes(q)
+        );
+      })
+    : enriched;
 
-  const totalPendente = enriched
+  const totalPendente = visible
     .filter((b) => b.displayStatus === "pendente" || b.displayStatus === "atrasado")
     .reduce((s, b) => s + b.totalAmount, 0);
-  const totalPago = enriched
+  const totalPago = visible
     .filter((b) => b.displayStatus === "pago")
     .reduce((s, b) => s + b.totalAmount, 0);
-  const countPendente = enriched.filter((b) => b.displayStatus === "pendente" || b.displayStatus === "atrasado").length;
+  const countPendente = visible.filter((b) => b.displayStatus === "pendente" || b.displayStatus === "atrasado").length;
 
   const categoriasComPendencia = new Set(
-    enriched.filter((b) => b.displayStatus !== "pago" && b.categoryName).map((b) => b.categoryName as string)
+    visible.filter((b) => b.displayStatus !== "pago" && b.categoryName).map((b) => b.categoryName as string)
   ).size;
 
   return (
@@ -193,6 +204,12 @@ export default function ContasReceber() {
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-3">
         <PeriodFilter value={period} onChange={setPeriod} />
+        <Input
+          placeholder="Buscar por cliente, descrição ou categoria"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
         <div className="flex rounded-lg border bg-background text-sm overflow-hidden">
           {(["", "pendente", "pago"] as const).map((s) => (
             <button
@@ -406,7 +423,7 @@ export default function ContasReceber() {
                         ))}
                       </TableRow>
                     ))
-                  ) : !enriched.length ? (
+                  ) : !visible.length ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                         <div className="flex flex-col items-center gap-2">
@@ -416,7 +433,7 @@ export default function ContasReceber() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    enriched.map((billing) => {
+                    visible.map((billing) => {
                       const isOverdue = billing.displayStatus === "atrasado";
                       const isPaid = billing.displayStatus === "pago";
                       return (
