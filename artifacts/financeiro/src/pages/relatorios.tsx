@@ -65,31 +65,36 @@ function downloadBlob(fileName: string, content: string, type: string) {
   a.download = fileName;
   a.click();
   URL.revokeObjectURL(url);
-            <CardTitle>Despesas por Categoria (mês)</CardTitle>
+}
 
-          <CardContent className="p-0 overflow-x-auto">
-            <Table className="min-w-[460px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {expensesByCategory.length ? (
-                  expensesByCategory.map((r) => (
-                    <TableRow key={r.category}>
-                      <TableCell className="font-medium">{r.category}</TableCell>
-                      <TableCell className="text-right text-red-600">{formatCurrency(r.amount)}</TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow><TableCell colSpan={2} className="h-24 text-center text-muted-foreground">Nenhum dado encontrado.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
+function exportProfitabilityCsv(rows: ProfitabilityRow[]) {
+  const header = [
+    "Cliente",
+    "Faturado",
+    "Recebido",
+    "Pendente",
+    "Despesas",
+    "Lucro liquido",
+    "Margem",
+    "Cobrancas",
+    "Receitas",
+    "Despesas lancadas",
+  ];
+  const body = rows.map((row) => [
+    row.clientName,
+    row.totalBilled,
+    row.totalPaid,
+    row.pendingAmount,
+    row.totalExpenses ?? 0,
+    row.netProfit ?? row.totalPaid - (row.totalExpenses ?? 0),
+    percent(row.margin),
+    row.billingCount,
+    row.revenueCount ?? 0,
+    row.expenseCount ?? 0,
+  ]);
+  const csv = [header, ...body].map((line) => line.map(csvCell).join(";")).join("\n");
   downloadBlob("lucratividade-clientes.csv", `\uFEFF${csv}`, "text/csv;charset=utf-8");
+}
 }
 
 function exportCashflowCsv(rows: any[]) {
