@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { 
   useListCategories, 
   useCreateCategory,
@@ -147,6 +147,15 @@ export default function Categorias() {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
+  const [search, setSearch] = useState<string>("");
+
+  const visible = useMemo(() => {
+    const q = String(search ?? "").trim().toLowerCase();
+    const list = Array.isArray(categories) ? categories : [];
+    if (!q) return list;
+    return list.filter((c) => String(c.name ?? "").toLowerCase().includes(q));
+  }, [categories, search]);
+
   const createCategory = useCreateCategory();
   const deleteCategory = useDeleteCategory();
 
@@ -209,7 +218,7 @@ export default function Categorias() {
           <div className="flex items-center space-x-2">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar categorias..." className="pl-9 max-w-sm" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar categorias..." className="pl-9 max-w-sm" />
             </div>
           </div>
         </CardHeader>
@@ -231,14 +240,14 @@ export default function Categorias() {
                     <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                   </TableRow>
                 ))
-              ) : categories?.length === 0 ? (
+              ) : visible.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
                     Nenhuma categoria encontrada
                   </TableCell>
                 </TableRow>
               ) : (
-                categories?.map((category) => (
+                visible.map((category) => (
                   <TableRow key={category.id}>
                     <TableCell className="font-medium">{category.name}</TableCell>
                     <TableCell>
