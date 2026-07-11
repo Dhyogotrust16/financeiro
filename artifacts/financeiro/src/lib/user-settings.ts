@@ -78,12 +78,16 @@ function parsePartners(data: unknown): PartnerSettings[] {
   return data
     .map((item) => {
       const partner = item as Partial<PartnerSettings>;
-      return {
+      const rawResponsavelLegal = partner.responsavelLegal;
+    return {
         id: String(partner.id ?? ""),
         name: String(partner.name ?? ""),
         email: String(partner.email ?? ""),
         percentage: Number(partner.percentage ?? 0),
-        responsavelLegal: partner.responsavelLegal === true || partner.responsavelLegal === "true",
+        responsavelLegal:
+          rawResponsavelLegal === true ||
+          String(rawResponsavelLegal).toLowerCase() === "true" ||
+          String(rawResponsavelLegal) === "1",
       };
     })
     .filter((partner) => partner.id && partner.name && Number.isFinite(partner.percentage));

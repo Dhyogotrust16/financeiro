@@ -28,6 +28,7 @@ import Socio from "@/pages/socio";
 import WhatsApp from "@/pages/whatsapp";
 import WhatsAppChat from "@/pages/whatsapp-chat";
 import WhatsAppDashboard from "@/pages/whatsapp-dashboard";
+import LivroCaixa from "@/pages/livro-caixa";
 import NotFound from "@/pages/not-found";
 import Shell from "@/components/layout/Shell";
 
@@ -106,6 +107,7 @@ function AppRoutes() {
       <Route path="/contas-receber" component={() => <ProtectedRoute component={ContasReceber} />} />
       <Route path="/contas-pagar" component={() => <ProtectedRoute component={ContasPagar} />} />
       <Route path="/honorarios" component={() => <ProtectedRoute component={Honorarios} />} />
+      <Route path="/livro-caixa" component={() => <ProtectedRoute component={LivroCaixa} />} />
       <Route path="/relatorios" component={() => <ProtectedRoute component={Relatorios} />} />
       <Route path="/categorias" component={() => <ProtectedRoute component={Categorias} />} />
       <Route path="/socio" component={() => <ProtectedRoute component={Socio} />} />

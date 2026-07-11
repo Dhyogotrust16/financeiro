@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { 
   useListCategories, 
   useCreateCategory,
+  useUpdateCategory,
   useDeleteCategory,
   getListCategoriesQueryKey
 } from "@workspace/api-client-react";
@@ -146,6 +147,8 @@ export default function Categorias() {
   const { toast } = useToast();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<CategoryForm & { id: number } | null>(null);
 
   const [search, setSearch] = useState<string>("");
 
@@ -157,6 +160,7 @@ export default function Categorias() {
   }, [categories, search]);
 
   const createCategory = useCreateCategory();
+  const updateCategory = useUpdateCategory();
   const deleteCategory = useDeleteCategory();
 
   const createDefaults: CategoryForm = { name: "", type: "despesa" };
@@ -179,6 +183,23 @@ export default function Categorias() {
     );
   }
 
+  function handleEdit(values: CategoryForm) {
+    if (!editingCategory) return;
+
+    updateCategory.mutate(
+      { id: editingCategory.id, data: values },
+      {
+        onSuccess: () => {
+          invalidate();
+          setIsEditOpen(false);
+          setEditingCategory(null);
+          toast({ title: "Categoria atualizada", description: "A categoria foi editada com sucesso." });
+        },
+        onError: () => toast({ title: "Erro", description: "Não foi possível atualizar a categoria.", variant: "destructive" }),
+      }
+    );
+  }
+
   function handleDelete(id: number) {
     deleteCategory.mutate(
       { id },
@@ -187,7 +208,10 @@ export default function Categorias() {
           invalidate();
           toast({ title: "Categoria excluída" });
         },
-        onError: () => toast({ title: "Erro", description: "Não foi possível excluir. A categoria pode estar em uso.", variant: "destructive" }),
+        onError: (error: any) => {
+          const message = error?.response?.data?.error || "Não foi possível excluir. A categoria pode estar vinculada a contas a pagar ou receber.";
+          toast({ title: "Erro", description: message, variant: "destructive" });
+        },
       }
     );
   }
@@ -211,6 +235,20 @@ export default function Categorias() {
         onSubmit={handleCreate}
         isPending={createCategory.isPending}
         title="Nova Categoria"
+      />
+
+      <CategoryDialog
+        open={isEditOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingCategory(null);
+          }
+          setIsEditOpen(open);
+        }}
+        defaultValues={editingCategory ?? createDefaults}
+        onSubmit={handleEdit}
+        isPending={updateCategory.isPending}
+        title="Editar Categoria"
       />
 
       <Card>
@@ -262,7 +300,17 @@ export default function Categorias() {
                         {category.type === "receita" ? "Receitas" : "Despesas"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setEditingCategory({ id: category.id, name: category.name, type: category.type });
+                          setIsEditOpen(true);
+                        }}
+                      >
+                        ✎
+                      </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button

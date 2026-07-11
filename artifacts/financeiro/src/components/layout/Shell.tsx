@@ -76,6 +76,7 @@ const navItems: NavItem[] = [
   { title: "Clientes", href: "/clientes", icon: Users, tone: "violet" },
   { title: "Receitas", href: "/receitas", icon: ArrowDownToLine, tone: "emerald" },
   { title: "Despesas", href: "/despesas", icon: ArrowUpToLine, tone: "rose" },
+  { title: "Livro Caixa", href: "/livro-caixa", icon: FileText, tone: "cyan" },
   { title: "Honorários", href: "/honorarios", icon: Landmark, tone: "green" },
   { title: "Cobranças", href: "/cobrancas", icon: Receipt, tone: "amber" },
   { title: "Contas a Receber", href: "/contas-receber", icon: Wallet, tone: "cyan" },

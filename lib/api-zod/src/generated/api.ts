@@ -227,6 +227,25 @@ export const CreateCategoryBody = zod.object({
 
 
 /**
+ * @summary Update category
+ */
+export const UpdateCategoryParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateCategoryBody = zod.object({
+  "name": zod.string(),
+  "type": zod.enum(['receita', 'despesa'])
+})
+
+export const UpdateCategoryResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "type": zod.enum(['receita', 'despesa'])
+})
+
+
+/**
  * @summary Delete category
  */
 export const DeleteCategoryParams = zod.object({
