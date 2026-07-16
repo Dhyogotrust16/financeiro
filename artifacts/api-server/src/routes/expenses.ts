@@ -104,7 +104,6 @@ router.delete("/:id", requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const [existing] = await db.select().from(expensesTable).where(and(eq(expensesTable.id, id), eq(expensesTable.userId, userId)));
   if (!existing) return res.status(404).json({ error: "Not found" });
-  if (existing.billedInId) return res.status(400).json({ error: "Não é possível excluir despesas já cobradas" });
   await db.delete(expensesTable).where(eq(expensesTable.id, id));
   return res.status(204).end();
 });

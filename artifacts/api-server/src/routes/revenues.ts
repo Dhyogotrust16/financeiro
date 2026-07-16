@@ -77,7 +77,6 @@ router.delete("/:id", requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const [existing] = await db.select().from(revenuesTable).where(and(eq(revenuesTable.id, id), eq(revenuesTable.userId, userId)));
   if (!existing) return res.status(404).json({ error: "Not found" });
-  if (existing.status === "recebido") return res.status(400).json({ error: "Não é possível excluir receitas já recebidas" });
   await db.delete(revenuesTable).where(eq(revenuesTable.id, id));
   return res.status(204).end();
 });
