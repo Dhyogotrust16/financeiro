@@ -454,15 +454,12 @@ export default function Receitas() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Excluir receita?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  {revenue.status === "recebido"
-                                    ? "Esta receita já foi recebida e não pode ser excluída."
-                                    : `"${revenue.description}" será excluída permanentemente.`}
+                                  "{revenue.description}" será excluída permanentemente.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                {revenue.status === "pendente" && (
-                                  <AlertDialogAction
+                                <AlertDialogAction
                                     onClick={() => handleDelete(revenue.id)}
                                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                   >
