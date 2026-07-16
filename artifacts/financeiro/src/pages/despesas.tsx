@@ -302,7 +302,7 @@ export default function Despesas() {
           invalidate();
           toast({ title: "Despesa excluída" });
         },
-        onError: () => toast({ title: "Erro", description: "Não é possível excluir despesas já faturadas.", variant: "destructive" }),
+        onError: () => toast({ title: "Erro", description: "Não foi possível excluir a despesa.", variant: "destructive" }),
       }
     );
   }

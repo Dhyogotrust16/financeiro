@@ -312,12 +312,6 @@ export default function Receitas() {
   }
 
   function handleDelete(id: number) {
-    const revenue = Array.isArray(revenues) ? revenues.find((r) => r.id === id) : undefined;
-    if (revenue?.status === "recebido") {
-      toast({ title: "Erro", description: "Não é possível excluir receitas já recebidas.", variant: "destructive" });
-      return;
-    }
-
     deleteRevenue.mutate(
       { id },
       {
@@ -325,7 +319,7 @@ export default function Receitas() {
           invalidate();
           toast({ title: "Receita excluída" });
         },
-        onError: () => toast({ title: "Erro", description: "Não é possível excluir receitas já recebidas.", variant: "destructive" }),
+        onError: () => toast({ title: "Erro", description: "Não foi possível excluir a receita.", variant: "destructive" }),
       }
     );
   }
