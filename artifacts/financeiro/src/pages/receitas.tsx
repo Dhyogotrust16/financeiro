@@ -465,7 +465,6 @@ export default function Receitas() {
                                   >
                                     Excluir
                                   </AlertDialogAction>
-                                )}
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
